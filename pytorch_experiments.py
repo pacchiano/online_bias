@@ -243,7 +243,7 @@ def run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_ra
 
 
 def main():
-	dataset = "Bank"
+	dataset = "Adult"
 	logging_frequency = 10
 	max_num_steps = 10000
 	logistic_learning_rate = .01
@@ -262,7 +262,7 @@ def main():
 	epsilon_greedy = False
 	epsilon = .1
 
-	MLP = True
+	MLP = False
 	representation_layer_size = 10
 
 	#run without any optimism or epsilon greedy
