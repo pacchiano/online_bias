@@ -243,7 +243,7 @@ def run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_ra
 
 
 def main():
-	dataset = "Adult"
+	dataset = "Bank"
 	logging_frequency = 10
 	max_num_steps = 10000
 	logistic_learning_rate = .01
