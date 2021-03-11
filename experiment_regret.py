@@ -47,15 +47,18 @@ def run_regret_experiment_pytorch( dataset,
     regret_wrt_baseline = True,
     MLP = True, 
     representation_layer_size = 10,
-    verbose = False):
+    verbose = True):
 
 
   protected_datasets_train, protected_datasets_test, train_dataset, test_dataset = get_dataset(dataset)
-  baseline_model = TorchBinaryLogisticRegression(random_init = random_init, fit_intercept=True, alpha = alpha, MLP = MLP, representation_layer_size = representation_layer_size)
+  baseline_model = TorchBinaryLogisticRegression(random_init = random_init, fit_intercept=True, alpha = alpha, 
+                MLP = MLP, representation_layer_size = representation_layer_size)
   
 
 
+
   for i in range(baseline_steps):
+    print(i)
     global_batch, protected_batches = get_batches( protected_datasets_train, train_dataset, baseline_batch_size) 
     batch_X, batch_y = global_batch
 

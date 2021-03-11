@@ -31,7 +31,7 @@ ray.init()
 
 @ray.remote
 def run_experiment_parallel(dataset, logging_frequency, max_num_steps, logistic_learning_rate,threshold, biased_threshold, batch_size, 
-	random_init, fit_intercept, mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, representation_layer_size):
+	random_init, fit_intercept, mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, representation_layer_size, baseline_steps):
 
 	timesteps, test_biased_accuracies_cum_averages, accuracies_cum_averages, train_biased_accuracies_cum_averages, train_cum_regret, loss_validation, loss_validation_biased, loss_baseline, baseline_accuracy = run_regret_experiment_pytorch( dataset, 
 																					logging_frequency, 
@@ -46,7 +46,8 @@ def run_experiment_parallel(dataset, logging_frequency, max_num_steps, logistic_
 																				    epsilon, 
 																				    alpha, 
 																				    MLP = MLP,
-																				    representation_layer_size = representation_layer_size )
+																				    representation_layer_size = representation_layer_size,
+																				    baseline_steps = baseline_steps )
 	return timesteps, test_biased_accuracies_cum_averages, accuracies_cum_averages, train_biased_accuracies_cum_averages, train_cum_regret,loss_validation, loss_validation_biased, loss_baseline, baseline_accuracy
 
 
@@ -54,7 +55,8 @@ def run_experiment_parallel(dataset, logging_frequency, max_num_steps, logistic_
 
 
 def run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_rate, threshold, 
-	biased_threshold, batch_size, random_init, fit_intercept, num_experiments, mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, representation_layer_size ):
+	biased_threshold, batch_size, random_init, fit_intercept, num_experiments, mahalanobis_regularizer, 
+	adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, representation_layer_size, baseline_steps ):
 	path = os.getcwd()
 
 	network_type = "MLP{}".format(representation_layer_size) if MLP else "Linear"
@@ -82,12 +84,12 @@ def run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_ra
 	# raise ValueError("asdlfkm")
 	if USE_RAY:
 		experiment_summaries = [ run_experiment_parallel.remote( dataset, logging_frequency, max_num_steps, logistic_learning_rate,threshold, biased_threshold, batch_size, 
-		random_init, fit_intercept, mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, representation_layer_size ) for _ in range(num_experiments)]
+		random_init, fit_intercept, mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, representation_layer_size, baseline_steps ) for _ in range(num_experiments)]
 		experiment_summaries = ray.get(experiment_summaries)
 
 	else:
 		experiment_summaries = [ run_experiment_parallel( dataset, logging_frequency, max_num_steps, logistic_learning_rate,threshold, biased_threshold, batch_size, 
-		random_init, fit_intercept, mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, representation_layer_size ) for _ in range(num_experiments)]
+		random_init, fit_intercept, mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, representation_layer_size, baseline_steps ) for _ in range(num_experiments)]
 
 
 	
@@ -246,6 +248,7 @@ def main():
 	dataset = "MultiSVM"
 	logging_frequency = 10
 	max_num_steps = 10000
+	baseline_steps = 500
 	logistic_learning_rate = .01
 	threshold = .5
 	biased_threshold = .5
@@ -262,7 +265,7 @@ def main():
 	epsilon_greedy = False
 	epsilon = .1
 
-	MLP = False
+	MLP = True
 	representation_layer_size = 10
 
 	#run without any optimism or epsilon greedy
@@ -270,11 +273,11 @@ def main():
 		for representation_layer_size in [10, 40, 100]:
 			run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_rate, threshold, 
 						biased_threshold, batch_size, random_init, fit_intercept, num_experiments, 
-						mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, representation_layer_size)
+						mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, representation_layer_size, baseline_steps)
 	else:
 		run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_rate, threshold, 
 					biased_threshold, batch_size, random_init, fit_intercept, num_experiments, 
-					mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, None)
+					mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, None, baseline_steps)
 
 		
 
@@ -286,11 +289,11 @@ def main():
 				for representation_layer_size in [10, 40, 100]:
 					run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_rate, threshold, 
 						biased_threshold, batch_size, random_init, fit_intercept, num_experiments, 
-						mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, representation_layer_size)
+						mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, representation_layer_size, baseline_steps)
 			else:
 				run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_rate, threshold, 
 					biased_threshold, batch_size, random_init, fit_intercept, num_experiments, 
-					mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, None)
+					mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, None, baseline_steps)
 
 	for epsilon in [.1]:#, .2]:#, .2, .5]:	
 		adjust_mahalanobis = False
@@ -299,11 +302,11 @@ def main():
 			for representation_layer_size in [10, 40, 100]:
 				run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_rate, threshold, 
 					biased_threshold, batch_size, random_init, fit_intercept, num_experiments, 
-					mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, representation_layer_size)
+					mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, representation_layer_size, baseline_steps)
 		else:
 				run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_rate, threshold, 
 					biased_threshold, batch_size, random_init, fit_intercept, num_experiments, 
-					mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, None)
+					mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, None, baseline_steps)
 
 
 main()
