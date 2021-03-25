@@ -31,7 +31,7 @@ ray.init()
 
 @ray.remote
 def run_experiment_parallel(dataset, logging_frequency, max_num_steps, logistic_learning_rate,threshold, biased_threshold, batch_size, 
-	random_init, fit_intercept, mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, representation_layer_size, baseline_steps):
+	random_init, fit_intercept, mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, representation_layer_size, baseline_steps, mahalanobis_discount_factor):
 
 	timesteps, test_biased_accuracies_cum_averages, accuracies_cum_averages, train_biased_accuracies_cum_averages, train_cum_regret, loss_validation, loss_validation_biased, loss_baseline, baseline_accuracy = run_regret_experiment_pytorch( dataset, 
 																					logging_frequency, 
@@ -47,7 +47,8 @@ def run_experiment_parallel(dataset, logging_frequency, max_num_steps, logistic_
 																				    alpha, 
 																				    MLP = MLP,
 																				    representation_layer_size = representation_layer_size,
-																				    baseline_steps = baseline_steps )
+																				    baseline_steps = baseline_steps ,
+																				    mahalanobis_discount_factor = mahalanobis_discount_factor)
 	return timesteps, test_biased_accuracies_cum_averages, accuracies_cum_averages, train_biased_accuracies_cum_averages, train_cum_regret,loss_validation, loss_validation_biased, loss_baseline, baseline_accuracy
 
 
@@ -56,7 +57,7 @@ def run_experiment_parallel(dataset, logging_frequency, max_num_steps, logistic_
 
 def run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_rate, threshold, 
 	biased_threshold, batch_size, random_init, fit_intercept, num_experiments, mahalanobis_regularizer, 
-	adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, representation_layer_size, baseline_steps ):
+	adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, representation_layer_size, baseline_steps , mahalanobis_discount_factor):
 	path = os.getcwd()
 
 	network_type = "MLP{}".format(representation_layer_size) if MLP else "Linear"
@@ -84,12 +85,12 @@ def run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_ra
 	# raise ValueError("asdlfkm")
 	if USE_RAY:
 		experiment_summaries = [ run_experiment_parallel.remote( dataset, logging_frequency, max_num_steps, logistic_learning_rate,threshold, biased_threshold, batch_size, 
-		random_init, fit_intercept, mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, representation_layer_size, baseline_steps ) for _ in range(num_experiments)]
+		random_init, fit_intercept, mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, representation_layer_size, baseline_steps, mahalanobis_discount_factor ) for _ in range(num_experiments)]
 		experiment_summaries = ray.get(experiment_summaries)
 
 	else:
 		experiment_summaries = [ run_experiment_parallel( dataset, logging_frequency, max_num_steps, logistic_learning_rate,threshold, biased_threshold, batch_size, 
-		random_init, fit_intercept, mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, representation_layer_size, baseline_steps ) for _ in range(num_experiments)]
+		random_init, fit_intercept, mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, representation_layer_size, baseline_steps, mahalanobis_discount_factor ) for _ in range(num_experiments)]
 
 
 	
@@ -165,8 +166,8 @@ def run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_ra
 		plt.title("Test and Train Accuracies {} - Epsilon Greedy {} - {}".format(dataset, epsilon, network_type))
 		plot_name = "{}_test_train_accuracies_epsgreedy_{}".format(dataset, epsilon)
 	if adjust_mahalanobis:
-		plt.title("Test and Train Accuracies {} - Optimism alpha {} - Mreg {} - {}".format(dataset, alpha, mahalanobis_regularizer, network_type))
-		plot_name = "{}_test_train_accuracies_optimism_alpha_{}_mahreg_{}".format(dataset, alpha, mahalanobis_regularizer)
+		plt.title("Test and Train Accuracies {} - Optimism alpha {} - Mreg {} - Mdisc {} - {}".format(dataset, alpha, mahalanobis_regularizer, mahalanobis_discount_factor, network_type))
+		plot_name = "{}_test_train_accuracies_optimism_alpha_{}_mahreg_{}_mdisc_{}".format(dataset, alpha, mahalanobis_regularizer, mahalanobis_discount_factor)
 	if not epsilon_greedy and not adjust_mahalanobis:
 		plt.title("Test and Train Accuracies {} - {} ".format(dataset, network_type))
 		plot_name  = "{}_test_train_accuracies_biased".format(dataset)
@@ -188,7 +189,7 @@ def run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_ra
 		plot_name = "{}_regret_epsgreedy_{}".format(dataset, epsilon)
 	if adjust_mahalanobis:
 		plt.title("Regret {} - Optimism alpha {} - Mreg {} - {}".format(dataset, alpha, mahalanobis_regularizer, network_type))
-		plot_name = "{}_regret_optimism_alpha_{}_mahreg_{}".format(dataset, alpha, mahalanobis_regularizer)
+		plot_name = "{}_regret_optimism_alpha_{}_mahreg_{}_mdisc_{}".format(dataset, alpha, mahalanobis_regularizer, mahalanobis_discount_factor)
 	if not epsilon_greedy and not adjust_mahalanobis:
 		plt.title("Regret {} - {}".format(dataset, network_type))
 		plot_name  = "{}_regret_biased".format(dataset)
@@ -245,10 +246,10 @@ def run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_ra
 
 
 def main():
-	dataset = "MNIST"
+	dataset = "MultiSVM"
 	logging_frequency = 10
 	max_num_steps = 10000
-	baseline_steps = 1000
+	baseline_steps = 2000
 	logistic_learning_rate = .01
 	threshold = .5
 	biased_threshold = .5
@@ -256,11 +257,12 @@ def main():
 	random_init = True
 	fit_intercept = True
 
-	num_experiments = 2
+	num_experiments = 10
 
 	adjust_mahalanobis = False
 	mahalanobis_regularizer = .1
 	alpha = 0
+	mahalanobis_discount_factor = .2
 
 	epsilon_greedy = False
 	epsilon = .1
@@ -268,45 +270,47 @@ def main():
 	MLP = False
 	representation_layer_size = 40
 
-	#run without any optimism or epsilon greedy
-	if MLP:
-		for representation_layer_size in [10, 40, 100]:
+
+	for mahalanobis_discount_factor in [1, .9, .8]:
+		#run without any optimism or epsilon greedy
+		if MLP:
+			for representation_layer_size in [10, 40, 100]:
+				run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_rate, threshold, 
+							biased_threshold, batch_size, random_init, fit_intercept, num_experiments, 
+							mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, representation_layer_size, baseline_steps, mahalanobis_discount_factor)
+		else:
 			run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_rate, threshold, 
 						biased_threshold, batch_size, random_init, fit_intercept, num_experiments, 
-						mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, representation_layer_size, baseline_steps)
-	else:
-		run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_rate, threshold, 
-					biased_threshold, batch_size, random_init, fit_intercept, num_experiments, 
-					mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, None, baseline_steps)
+						mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, None, baseline_steps, mahalanobis_discount_factor)
 
-		
+			
 
-	for alpha in [1]:#, 2, 3, 4, 5, 10]:
-		adjust_mahalanobis = True
-		epsilon_greedy = False
-		for mahalanobis_regularizer in [.1]:#, 1]:#[.1, 1]:
+		for alpha in [1, 2, 3]:#, 2, 3, 4, 5, 10]:
+			adjust_mahalanobis = True
+			epsilon_greedy = False
+			for mahalanobis_regularizer in [.1]:#, 1]:#[.1, 1]:
+				if MLP:
+					for representation_layer_size in [10, 40, 100]:
+						run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_rate, threshold, 
+							biased_threshold, batch_size, random_init, fit_intercept, num_experiments, 
+							mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, representation_layer_size, baseline_steps, mahalanobis_discount_factor)
+				else:
+					run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_rate, threshold, 
+						biased_threshold, batch_size, random_init, fit_intercept, num_experiments, 
+						mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, None, baseline_steps, mahalanobis_discount_factor)
+
+		for epsilon in [.1]:#, .2]:#, .2, .5]:	
+			adjust_mahalanobis = False
+			epsilon_greedy = True
 			if MLP:
 				for representation_layer_size in [10, 40, 100]:
 					run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_rate, threshold, 
 						biased_threshold, batch_size, random_init, fit_intercept, num_experiments, 
-						mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, representation_layer_size, baseline_steps)
+						mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, representation_layer_size, baseline_steps, mahalanobis_discount_factor)
 			else:
-				run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_rate, threshold, 
-					biased_threshold, batch_size, random_init, fit_intercept, num_experiments, 
-					mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, None, baseline_steps)
-
-	for epsilon in [.1]:#, .2]:#, .2, .5]:	
-		adjust_mahalanobis = False
-		epsilon_greedy = True
-		if MLP:
-			for representation_layer_size in [10, 40, 100]:
-				run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_rate, threshold, 
-					biased_threshold, batch_size, random_init, fit_intercept, num_experiments, 
-					mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, representation_layer_size, baseline_steps)
-		else:
-				run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_rate, threshold, 
-					biased_threshold, batch_size, random_init, fit_intercept, num_experiments, 
-					mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, None, baseline_steps)
+					run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_rate, threshold, 
+						biased_threshold, batch_size, random_init, fit_intercept, num_experiments, 
+						mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, None, baseline_steps, mahalanobis_discount_factor)
 
 
 main()

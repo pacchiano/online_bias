@@ -47,6 +47,7 @@ def run_regret_experiment_pytorch( dataset,
     regret_wrt_baseline = True,
     MLP = True, 
     representation_layer_size = 10,
+    mahalanobis_discount_factor = 1,
     verbose = True):
 
 
@@ -253,12 +254,12 @@ def run_regret_experiment_pytorch( dataset,
       # raise ValueError("asdflkm")
       if adjust_mahalanobis:
         if len(cummulative_data_covariance) == 0:
-          cummulative_data_covariance = mahalanobis_regularizer*np.eye(representation_X.shape[1])+np.dot(np.transpose(representation_X), representation_X)
+          cummulative_data_covariance = np.dot(np.transpose(representation_X), representation_X)
         else:
-          cummulative_data_covariance += np.dot(np.transpose(representation_X), representation_X)
+          cummulative_data_covariance = mahalanobis_discount_factor*cummulative_data_covariance +  np.dot(np.transpose(representation_X), representation_X)
 
       #### This can be done instead by using the Sherman-Morrison Formula.
-        inverse_cummulative_data_covariance = torch.from_numpy(np.linalg.inv(cummulative_data_covariance)).float()
+        inverse_cummulative_data_covariance = torch.from_numpy(np.linalg.inv(mahalanobis_regularizer*np.eye(representation_X.shape[1])+ cummulative_data_covariance)).float()
 
 
     
