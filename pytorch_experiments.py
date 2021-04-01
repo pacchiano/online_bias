@@ -186,7 +186,7 @@ def run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_ra
 	plt.ylabel("Accuracy")
 	#plt.legend(loc = "lower right")
 
-	lg = plt.legend(bbox_to_anchor=(1.05, 1), fontsize = 8)
+	lg = plt.legend(bbox_to_anchor=(1.05, 1), fontsize = 8,loc = "upper left")
 	#plt.tight_layout()
 
 
@@ -215,7 +215,7 @@ def run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_ra
 	plt.xlabel("Timesteps")
 	plt.ylabel("Regret")
 	#plt.legend(loc = "lower right")
-	lg = plt.legend(bbox_to_anchor=(1.05, 1), fontsize = 8)
+	lg = plt.legend(bbox_to_anchor=(1.05, 1), fontsize = 8, loc = "upper left")
 	#plt.tight_layout()
 
 	plt.savefig("{}/{}.png".format(base_figs_directory, plot_name),bbox_extra_artists=(lg,), bbox_inches='tight')
@@ -251,7 +251,7 @@ def run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_ra
 	plt.ylabel("Loss")
 	#plt.legend(loc = "lower right")
 
-	lg = plt.legend(bbox_to_anchor=(1.05, 1), fontsize = 8)
+	lg = plt.legend(bbox_to_anchor=(1.05, 1), fontsize = 8, loc = "upper left")
 	#plt.tight_layout()
 
 	plt.savefig("{}/{}.png".format(base_figs_directory, plot_name), bbox_extra_artists=(lg,), bbox_inches='tight')
