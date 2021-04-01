@@ -79,6 +79,8 @@ def run_regret_experiment_pytorch( dataset,
     optimizer_baseline.step()
 
 
+  IPython.embed()
+  raise ValueError("asldfkm")
 
   with torch.no_grad():
     baseline_batch_test, protected_batches_test = get_batches(protected_datasets_test, test_dataset, 1000)
