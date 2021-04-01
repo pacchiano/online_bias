@@ -187,7 +187,7 @@ def run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_ra
 	#plt.legend(loc = "lower right")
 
 	plt.legend(bbox_to_anchor=(1.05, 1), fontsize = 8)
-	plt.tight_layout()
+	#plt.tight_layout()
 
 
 	plt.savefig("{}/{}.png".format(base_figs_directory, plot_name))
@@ -216,7 +216,7 @@ def run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_ra
 	plt.ylabel("Regret")
 	#plt.legend(loc = "lower right")
 	plt.legend(bbox_to_anchor=(1.05, 1), fontsize = 8)
-	plt.tight_layout()
+	#plt.tight_layout()
 
 	plt.savefig("{}/{}.png".format(base_figs_directory, plot_name))
 	
@@ -252,7 +252,7 @@ def run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_ra
 	#plt.legend(loc = "lower right")
 
 	plt.legend(bbox_to_anchor=(1.05, 1), fontsize = 8)
-	plt.tight_layout()
+	#plt.tight_layout()
 
 	plt.savefig("{}/{}.png".format(base_figs_directory, plot_name))
 	plt.close('all')
