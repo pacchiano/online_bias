@@ -147,6 +147,9 @@ class TorchBinaryLogisticRegression:
 
     def get_loss(self, batch_X, batch_y):
       #self.__initialize_theta(batch_X)
+      if len(batch_y) == 1:
+        IPython.embed()
+        raise ValueError("asdflkm")
       batch_X = self.__update_batch(batch_X)    
       batch_X = torch.from_numpy(batch_X)
       batch_y = torch.from_numpy(batch_y)
