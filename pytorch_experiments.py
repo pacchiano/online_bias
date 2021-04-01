@@ -163,13 +163,13 @@ def run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_ra
 
 
 	if epsilon_greedy:
-		plt.title("Test and Train Accuracies {} - Epsilon Greedy {} - {}".format(dataset, epsilon, network_type))
+		plt.title("Test and Train Accuracies {} - Epsilon Greedy {} - {}".format(dataset, epsilon, network_type), fontsize = 8)
 		plot_name = "{}_test_train_accuracies_epsgreedy_{}_{}".format(dataset, epsilon, network_type)
 	if adjust_mahalanobis:
-		plt.title("Test and Train Accuracies {} - Optimism alpha {} - Mreg {} - Mdisc {} - {}".format(dataset, alpha, mahalanobis_regularizer, mahalanobis_discount_factor, network_type))
+		plt.title("Test and Train Accuracies {} - Optimism alpha {} - Mreg {} - Mdisc {} - {}".format(dataset, alpha, mahalanobis_regularizer, mahalanobis_discount_factor, network_type), fontsize = 8)
 		plot_name = "{}_test_train_accuracies_optimism_alpha_{}_mahreg_{}_mdisc_{}_{}".format(dataset, alpha, mahalanobis_regularizer, mahalanobis_discount_factor, network_type)
 	if not epsilon_greedy and not adjust_mahalanobis:
-		plt.title("Test and Train Accuracies {} - {} ".format(dataset, network_type))
+		plt.title("Test and Train Accuracies {} - {} ".format(dataset, network_type), fontsize = 8)
 		plot_name  = "{}_test_train_accuracies_biased".format(dataset, network_type)
 
 	plt.xlabel("Timesteps")
@@ -190,13 +190,13 @@ def run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_ra
 	
 
 	if epsilon_greedy:
-		plt.title("Regret {} - Epsilon Greedy {} - {}".format(dataset, epsilon, network_type))
+		plt.title("Regret {} - Epsilon Greedy {} - {}".format(dataset, epsilon, network_type), fontsize = 8)
 		plot_name = "{}_regret_epsgreedy_{}_{}".format(dataset, epsilon, network_type)
 	if adjust_mahalanobis:
-		plt.title("Regret {} - Optimism alpha {} - Mreg {} - Mdisc {} - {}".format(dataset, alpha, mahalanobis_regularizer, mahalanobis_discount_factor, network_type))
+		plt.title("Regret {} - Optimism alpha {} - Mreg {} - Mdisc {} - {}".format(dataset, alpha, mahalanobis_regularizer, mahalanobis_discount_factor, network_type), fontsize = 8)
 		plot_name = "{}_regret_optimism_alpha_{}_mahreg_{}_mdisc_{}_{}".format(dataset, alpha, mahalanobis_regularizer, mahalanobis_discount_factor, network_type)
 	if not epsilon_greedy and not adjust_mahalanobis:
-		plt.title("Regret {} - {}".format(dataset, network_type))
+		plt.title("Regret {} - {}".format(dataset, network_type), fontsize = 8)
 		plot_name  = "{}_regret_biased_{}".format(dataset, network_type)
 
 
@@ -226,13 +226,13 @@ def run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_ra
 		[mean_loss_validation_baseline_summary + .5*std_loss_validation_baseline_summary]*len(timesteps), color = "black", alpha = .1)
 
 	if epsilon_greedy:
-		plt.title("Loss {} - Epsilon Greedy {} - {}".format(dataset, epsilon, network_type))
+		plt.title("Loss {} - Epsilon Greedy {} - {}".format(dataset, epsilon, network_type), fontsize = 8)
 		plot_name = "{}_loss_epsgreedy_{}_{}".format(dataset, epsilon, network_type)
 	if adjust_mahalanobis:
-		plt.title("Loss {} - Optimism alpha {} - Mreg {} - Mdisc {} - {}".format(dataset, alpha, mahalanobis_regularizer, mahalanobis_discount_factor, network_type))
+		plt.title("Loss {} - Optimism alpha {} - Mreg {} - Mdisc {} - {}".format(dataset, alpha, mahalanobis_regularizer, mahalanobis_discount_factor, network_type), fontsize = 8)
 		plot_name = "{}_loss_optimism_alpha_{}_mahreg_{}_mdisc_{}_{}".format(dataset, alpha, mahalanobis_regularizer, mahalanobis_discount_factor, network_type)
 	if not epsilon_greedy and not adjust_mahalanobis:
-		plt.title("Loss {} - {}".format(dataset, network_type))
+		plt.title("Loss {} - {}".format(dataset, network_type), fontsize = 8)
 		plot_name  = "{}_loss_biased_{}".format(dataset, network_type)
 
 
