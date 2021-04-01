@@ -68,12 +68,22 @@ def run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_ra
 	if not os.path.isdir(base_data_directory):
 		try:
 
-			os.makedirs(base_figs_directory)
+			#os.makedirs(base_figs_directory)
 			os.makedirs(base_data_directory)
 		except OSError:
-			print("Creation of directories failed")
+			print("Creation of data directories failed")
 		else:
-			print("Successfully created the directory")
+			print("Successfully created the data directory")
+
+	if not os.path.isdir(base_figs_directory):
+		try:
+
+			os.makedirs(base_figs_directory)
+			#os.makedirs(base_data_directory)
+		except OSError:
+			print("Creation of figs directories failed")
+		else:
+			print("Successfully created the figs directory")
 
 
 
