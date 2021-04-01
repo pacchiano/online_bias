@@ -242,8 +242,9 @@ def run_regret_experiment_pytorch( dataset,
       # model_biased.update(biased_grad, 1.0)
 
       optimizer_biased.zero_grad()
-      IPython.embed()
+      #IPython.embed()
       #raise ValueError("asdlfkm")
+      print("biased batch X ", biased_batch_X, " biased batch y ", biased_batch_y)
       biased_loss = model_biased.get_loss(biased_batch_X, biased_batch_y)
       biased_loss.backward()
       optimizer_biased.step()
