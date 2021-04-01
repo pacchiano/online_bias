@@ -133,10 +133,10 @@ class TorchBinaryLogisticRegression:
           return self.__add_intercept(batch_X)
         return batch_X
  
-    # def update_batch(self, batch_X):
-    #     if self.fit_intercept:
-    #       return self.__add_intercept(batch_X)
-    #     return batch_X
+    def update_batch(self, batch_X):
+        if self.fit_intercept:
+          return self.__add_intercept(batch_X)
+        return batch_X
 
     def get_representation(self, batch_X):
       batch_X = self.__update_batch(batch_X) 
