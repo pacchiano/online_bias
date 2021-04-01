@@ -209,9 +209,8 @@ def run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_ra
 	plt.tight_layout()
 
 	plt.savefig("{}/{}.png".format(base_figs_directory, plot_name))
+	
 	plt.close('all')
-
-
 	### LOSS PLOTS
 	plt.plot(timesteps, mean_loss_validation_averages, label = "Unbiased model loss", linestyle = "dashed", linewidth = 3.5, color = "blue")
 	plt.fill_between(timesteps, mean_loss_validation_averages - .5*std_loss_validation_averages, 
