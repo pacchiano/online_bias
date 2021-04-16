@@ -28,77 +28,6 @@ from models import *
 import IPython
 
 
-def train_model(model, num_steps, train_dataset, batch_size, verbose = False):
-
-  for i in range(num_steps):
-    if verbose:
-      print("train model iteration ", i)
-    batch_X, batch_y = train_dataset.get_batch(batch_size)
-    
-    #global_batch, protected_batches = get_batches( protected_datasets_train, train_dataset, batch_size) 
-    #batch_X, batch_y = global_batch
-
-
-    if i ==0:
-      model.initialize_model(batch_X)           
-      optimizer = torch.optim.SGD(model.network.parameters(), lr = 0.01)
-
-
-
-    optimizer.zero_grad()
-    loss = model.get_loss(batch_X, batch_y)
-    
-
-    loss.backward()
-    optimizer.step()
-
-  return model
-
-
-
-def train_model_counterfactual(model, num_steps, train_dataset, batch_size, query_batch, counterfactual_regularizer = 1, verbose = False):
-
-  for i in range(num_steps):
-    if verbose:
-      print("train model iteration ", i)
-    batch_X, batch_y = train_dataset.get_batch(batch_size)
-    
-    #global_batch, protected_batches = get_batches( protected_datasets_train, train_dataset, batch_size) 
-    #batch_X, batch_y = global_batch
-
-
-    if i ==0:
-      model.initialize_model(batch_X)           
-      optimizer = torch.optim.SGD(model.network.parameters(), lr = 0.01)
-
-
-
-    optimizer.zero_grad()
-    loss = model.get_loss(batch_X, batch_y) - counterfactual_regularizer*torch.mean(model.predict_prob(query_batch))
-    
-    # IPython.embed()
-    # raise ValueError("asdflkm")
-
-    loss.backward()
-    optimizer.step()
-
-  return model
-
-
-
-
-
-
-
-def gradient_step(model, optimizer, batch_X, batch_y):
-
-    optimizer.zero_grad()
-    loss = model.get_loss(batch_X, batch_y)
-    loss.backward()
-    optimizer.step()
-
-    return model, optimizer
-
 
 def run_regret_experiment_pytorch( dataset, 
     logging_frequency, 
@@ -119,9 +48,8 @@ def run_regret_experiment_pytorch( dataset,
     MLP = True, 
     representation_layer_size = 10,
     mahalanobis_discount_factor = 1,
-    training_mode = "full_minimization",
-    num_full_minimization_steps = 1000,
-    decision_type = "counterfactual",
+    random_network_exploration = False,
+    fake_labels_type = "allzero",
     verbose = True):
 
 
@@ -133,14 +61,40 @@ def run_regret_experiment_pytorch( dataset,
     baseline_batch_size = batch_size
 
 
-  baseline_model = train_model(baseline_model, baseline_steps, train_dataset, baseline_batch_size)
+  for i in range(baseline_steps):
+    print(i)
+    global_batch, protected_batches = get_batches( protected_datasets_train, train_dataset, baseline_batch_size) 
+    batch_X, batch_y = global_batch
 
+
+    if i ==0:
+      baseline_model.initialize_model(batch_X)           
+      optimizer_baseline = torch.optim.SGD(baseline_model.network.parameters(), lr = 0.01)
+
+
+
+    optimizer_baseline.zero_grad()
+    loss_baseline = baseline_model.get_loss(batch_X, batch_y)
+    
+
+    loss_baseline.backward()
+    optimizer_baseline.step()
+
+
+  # IPython.embed()
+  # raise ValueError("asldfkm")
 
   with torch.no_grad():
     baseline_batch_test, protected_batches_test = get_batches(protected_datasets_test, test_dataset, 1000)
     baseline_accuracy, protected_accuracies = get_accuracies(baseline_batch_test, protected_batches_test, baseline_model, threshold)
     loss_validation_baseline = baseline_model.get_loss(baseline_batch_test[0], baseline_batch_test[1])
     
+
+  # import IPython
+  # IPython.embed()
+  # raise ValueError("alskdfm")
+
+
 
   num_protected_groups = len(protected_datasets_train)
   wass_distances = [[] for _ in range(num_protected_groups)]
@@ -166,9 +120,6 @@ def run_regret_experiment_pytorch( dataset,
   model =  TorchBinaryLogisticRegression(random_init = random_init, fit_intercept=True, alpha = alpha, MLP = MLP, representation_layer_size = representation_layer_size)
   model_biased = TorchBinaryLogisticRegression(random_init = random_init, fit_intercept=True, alpha = alpha, MLP = MLP, representation_layer_size =representation_layer_size)
 
-  if decision_type == "counterfactual":
-    model_biased_prediction = TorchBinaryLogisticRegression(random_init = random_init, fit_intercept=True, alpha = alpha, MLP = MLP, representation_layer_size =representation_layer_size)
-
   cummulative_data_covariance = [] 
   inverse_cummulative_data_covariance = []
 
@@ -177,10 +128,6 @@ def run_regret_experiment_pytorch( dataset,
   timesteps = []
 
   #IPython.embed()
-
-  if training_mode == "full_minimization":
-    biased_dataset = GrowingNumpyDataSet()
-    unbiased_dataset = GrowingNumpyDataSet()
 
   while counter < max_num_steps:
     counter += 1 
@@ -192,78 +139,42 @@ def run_regret_experiment_pytorch( dataset,
     if counter ==1:
       model.initialize_model(batch_X)
       model_biased.initialize_model(batch_X)
-      if decision_type == "counterfactual":
-        model_biased_prediction.initialize_model(batch_X)
-
 
 
       optimizer_model = torch.optim.Adam(model.network.parameters(), lr = 0.01)
       optimizer_biased = torch.optim.Adam(model_biased.network.parameters(), lr = 0.01)
 
 
-
-    if training_mode == "full_minimization":
-      unbiased_dataset.add_data(batch_X, batch_y)      
-      model = train_model(model, num_full_minimization_steps, unbiased_dataset, batch_size)
-
-
-    elif training_mode == "gradient_step":
-      model, optimizer_model = gradient_step(model, optimizer_model, batch_X, batch_y)
+    # print("before optimization")
+    # for parameter in model.network.parameters():
+    #   print(torch.norm(parameter))
 
 
-
-    # optimizer_model.zero_grad()
-    # loss = model.get_loss(batch_X, batch_y)
-    # loss.backward()
-    # optimizer_model.step()
-
+    optimizer_model.zero_grad()
+    loss = model.get_loss(batch_X, batch_y)
+    loss.backward()
+    optimizer_model.step()
 
 
-  
-    if decision_type == "mahalanobis_decisions":
-      ## Training biased model
-      global_biased_prediction, protected_biased_predictions = get_predictions(global_batch, protected_batches, model_biased, inverse_cummulative_data_covariance)
+    # print("after optimization")
+    # for parameter in model.network.parameters():
+    #   print(torch.norm(parameter))
+
+    
+    #model.theta.detach()
 
 
-    elif decision_type == "counterfactual":
-        if training_mode != "full_minimization":
-          raise ValueError("The counterfactual decision mode is incompatible with all traning modes different from full_minimization")
-        
-        if biased_dataset.get_size() == 0:
-          ### ACCEPT ALL POINTS
-          global_biased_prediction = [1 for _ in range(batch_size)]
-
-        ### Evaluate the loss over the existing dataset.
-        else:
-
-          ### EVALUATE THE EXPECTED LOSS ###
-          with torch.no_grad():
-            all_data_X, all_data_Y = biased_dataset.get_batch(10000000000)
-            loss_initial = model_biased.get_loss(all_data_X, all_data_Y)
-
-          counterfactual_reg = 1
-
-          loss_final = float("inf")
-          while loss_final > 2*loss_initial:
-
-            model_biased_prediction = train_model_counterfactual(model_biased_prediction, num_full_minimization_steps, biased_dataset, batch_size, batch_X, counterfactual_regularizer = counterfactual_reg, verbose = False)
-            
-
-            ##### EVALUATE THE EXPECTED LOSS ###  
-            with torch.no_grad():
-              loss_final = model_biased_prediction.get_loss(all_data_X, all_data_Y)
-
-            counterfactual_reg *= .5*counterfactual_reg
-
-          global_biased_prediction, _ = get_predictions(global_batch, protected_batches, model_biased_prediction)
+    # IPython.embed()
+    # raise ValueError("alskdfm")
 
 
-          # IPython.embed()
-          # if counter == 3:
-          #   raise ValueError("asldkfm")
+    #logistic_gradient = model.get_gradient(batch_X, batch_y)
+    #print("Logist gradient norm {}".format(np.linalg.norm(logistic_gradient)))
+    #grad = logistic_learning_rate*logistic_gradient  
+    #model.update(grad, 1.0)
 
-
-
+    ## Training biased model
+    global_biased_prediction, protected_biased_predictions = get_predictions(global_batch, protected_batches, model_biased, inverse_cummulative_data_covariance)
     biased_batch_X = []
     biased_batch_y = []
     inverse_probabilities = []
@@ -328,36 +239,17 @@ def run_regret_experiment_pytorch( dataset,
 
     if biased_batch_size > 0:
 
-
-      if training_mode == "full_minimization":
-        biased_dataset.add_data(biased_batch_X, biased_batch_y)
-        model_biased = train_model(model_biased, num_full_minimization_steps, biased_dataset, batch_size)
-
-
-
-
-
       # logistic_biased_gradient = model_biased.get_gradient(biased_batch_X, biased_batch_y,inverse_probabilities )
       # biased_grad = logistic_learning_rate*logistic_biased_gradient
       # model_biased.update(biased_grad, 1.0)
 
-      elif training_mode == "gradient_step":
-        model_biased, optimizer_biased = gradient_step(model_biased, optimizer_biased, biased_batch_X, biased_batch_y)
-
-
-      else: 
-        raise ValueError("Unrecognized training mode")
-
-
-
-
-      # optimizer_biased.zero_grad()
-      # #IPython.embed()
-      # #raise ValueError("asdlfkm")
-      # #print("biased batch X ", biased_batch_X, " biased batch y ", biased_batch_y)
-      # biased_loss = model_biased.get_loss(biased_batch_X, biased_batch_y)
-      # biased_loss.backward()
-      # optimizer_biased.step()
+      optimizer_biased.zero_grad()
+      #IPython.embed()
+      #raise ValueError("asdlfkm")
+      print("biased batch X ", biased_batch_X, " biased batch y ", biased_batch_y)
+      biased_loss = model_biased.get_loss(biased_batch_X, biased_batch_y)
+      biased_loss.backward()
+      optimizer_biased.step()
       #model_biased.theta.detach()
 
       #updated_batch_X = model_biased.update_batch(biased_batch_X)
@@ -378,9 +270,6 @@ def run_regret_experiment_pytorch( dataset,
 
 
     
-
-    #### DIAGNOSTICS ######
-
     ## Compute accuracy diagnostics
     if counter % logging_frequency*1.0 == 0:
       train_regret.append(batch_regret)

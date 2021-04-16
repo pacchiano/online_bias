@@ -25,11 +25,11 @@ import pickle
 
 from experiment_regret import *
 
-USE_RAY = True
-ray.init()
+USE_RAY = False
+#ray.init()
 
 
-@ray.remote
+#@ray.remote
 def run_experiment_parallel(dataset, logging_frequency, max_num_steps, logistic_learning_rate,threshold, biased_threshold, batch_size, 
 	random_init, fit_intercept, mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, representation_layer_size, baseline_steps, mahalanobis_discount_factor):
 
@@ -269,8 +269,8 @@ def run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_ra
 def main():
 	dataset = "MultiSVM"
 	logging_frequency = 10
-	max_num_steps = 10000
-	baseline_steps = 10000
+	max_num_steps = 500
+	baseline_steps = 500
 	logistic_learning_rate = .01
 	threshold = .5
 	biased_threshold = .5
@@ -284,7 +284,6 @@ def main():
 	mahalanobis_regularizer = .1
 	alpha = 0
 	mahalanobis_discount_factor = .2
-
 
 
 

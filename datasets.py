@@ -49,6 +49,52 @@ class DataSet:
     return (X,Y)
 
 
+class GrowingNumpyDataSet:
+  def __init__(self):
+    self.dataset_X = []# None
+    self.dataset_Y = []#None
+    self.last_data_addition = None
+    self.random_state = 0
+
+  def get_size(self):
+    return len(self.dataset_Y)
+    
+  def add_data(self,X, Y):
+    if len(self.dataset_X) == 0 and len(self.dataset_Y) == 0:
+      self.dataset_X = X
+      self.dataset_Y = Y
+    else:
+      self.dataset_X = np.concatenate((self.dataset_X, X))
+      self.dataset_Y = np.concatenate((self.dataset_Y, Y))
+    
+    self.last_data_addition = X.shape[0]
+
+  def pop_last_data(self):
+    if self.dataset_X.shape[0] == self.last_data_addition:
+      self.dataset_X = None
+      self.dataset_Y = None
+
+    else:
+      self.dataset_X = self.dataset_X[:-self.last_data_addition, :]
+      self.dataset_Y = self.dataset_Y[:-self.last_data_addition, :]
+
+
+  def get_batch(self, batch_size):
+    if batch_size > self.dataset_X.shape[0]:
+      X = self.dataset_X
+      Y = self.dataset_Y
+    else:
+      X = pd.DataFrame(self.dataset_X).sample(batch_size, random_state = self.random_state).values
+      Y = pd.DataFrame(self.dataset_Y).sample(batch_size, random_state = self.random_state).values
+    self.random_state += 1
+
+    return (X,Y)
+
+
+
+
+
+
 
 class MNISTDataset:
   def __init__(self, train, batch_size, symbol):
@@ -255,6 +301,9 @@ def get_dataset(dataset, batch_size, test_batch_size):
 
     train_dataset = DataSet(x_all_train, y_all_train)
     test_dataset = DataSet(x_all_test, y_all_test) 
+
+    import IPython
+    IPython.embed()
 
     xy_protected_train = collect_adult_protected_xy(
       x_all_train, y_all_train, PROTECTED_GROUPS)
