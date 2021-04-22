@@ -30,11 +30,11 @@ from experiment_regret import *
 
 
 
-USE_RAY = False#True
+USE_RAY = True
 ray.init()
 
 
-#@ray.remote
+@ray.remote
 def run_experiment_parallel(dataset, logging_frequency, max_num_steps, logistic_learning_rate,threshold, biased_threshold, batch_size, 
 	random_init, fit_intercept, mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, representation_layer_size, baseline_steps, mahalanobis_discount_factor, training_mode, decision_type):
 
@@ -270,7 +270,7 @@ def run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_ra
 
 	plt.xlabel("Timesteps")
 	plt.ylabel("Loss")
-	#plt.legend(loc = "lower right")
+	#plt.legend(loc = "lower right")good
 
 	lg = plt.legend(bbox_to_anchor=(1.05, 1), fontsize = 8, loc = "upper left")
 	#plt.tight_layout()
