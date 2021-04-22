@@ -163,15 +163,15 @@ def run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_ra
 
 
 
-	plt.plot(timesteps,mean_test_biased_accuracies_cum_averages, label = "Online Decision Test - no optimistic bonus", linestyle = "dashed", linewidth = 3.5, color="blue")
+	plt.plot(timesteps,mean_test_biased_accuracies_cum_averages, label = "Biased Model Test - no decision adjustment", linestyle = "dashed", linewidth = 3.5, color="blue")
 	plt.fill_between(timesteps, mean_test_biased_accuracies_cum_averages - .5*std_test_biased_accuracies_cum_averages, 
 		mean_test_biased_accuracies_cum_averages + .5*std_test_biased_accuracies_cum_averages, color = "blue", alpha = .1 )
 
-	plt.plot(timesteps,mean_accuracies_cum_averages, label = "SGD Test - train with full batches", linestyle = "dashed", linewidth = 3.5, color = "red")
+	plt.plot(timesteps,mean_accuracies_cum_averages, label = "Unbiased Model Test - all data train", linestyle = "dashed", linewidth = 3.5, color = "red")
 	plt.fill_between(timesteps, mean_accuracies_cum_averages - .5*std_accuracies_cum_averages, 
 		mean_accuracies_cum_averages + .5*std_accuracies_cum_averages,color = "red", alpha = .1 )
 
-	plt.plot(timesteps, mean_train_biased_accuracies_cum_averages, label = "Online Decision Train - SGD using filtered data", linestyle = "dashed", linewidth = 3.5, color = "violet"  )
+	plt.plot(timesteps, mean_train_biased_accuracies_cum_averages, label = "Online Biased Model - filtered data train", linestyle = "dashed", linewidth = 3.5, color = "violet"  )
 	plt.fill_between(timesteps, mean_train_biased_accuracies_cum_averages+ .5*std_train_biased_accuracies_cum_averages, 
 		mean_train_biased_accuracies_cum_averages - .5*std_train_biased_accuracies_cum_averages, color = "violet", alpha = .1)
 
@@ -294,7 +294,7 @@ def main():
 
 		logging_frequency = 10
 		max_num_steps = 110
-		baseline_steps = 1000
+		baseline_steps = 10000
 		logistic_learning_rate = .01
 		threshold = .5
 		biased_threshold = .5
