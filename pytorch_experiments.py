@@ -319,10 +319,10 @@ def main():
 
 
 		for MLP, representation_layer_size, training_mode, decision_type, adjust_mahalanobis, epsilon_greedy, epsilon, mahalanobis_discount_factor, mahalanobis_regularizer, alpha in all_params:
-			training_mode = "full_minimization"
-			decision_type = "counterfactual"
-			adjust_mahalanobis = False
-			epsilon_greedy = False
+			# training_mode = "full_minimization"
+			# decision_type = "counterfactual"
+			# adjust_mahalanobis = False
+			# epsilon_greedy = False
 
 			run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_rate, threshold, 
 						biased_threshold, batch_size, random_init, fit_intercept, num_experiments, 
