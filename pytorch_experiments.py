@@ -293,7 +293,7 @@ def main():
 		training_modes = [ "full_minimization", "gradient_step"]
 
 		logging_frequency = 10
-		max_num_steps = 110
+		max_num_steps = 500
 		baseline_steps = 10000
 		logistic_learning_rate = .01
 		threshold = .5
