@@ -220,7 +220,7 @@ def run_regret_experiment_pytorch( dataset,
 
 
   
-    if decision_type == "mahalanobis_decisions":
+    if decision_type == "simple":
       ## Training biased model
       global_biased_prediction, protected_biased_predictions = get_predictions(global_batch, protected_batches, model_biased, inverse_cummulative_data_covariance)
 
