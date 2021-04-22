@@ -249,7 +249,7 @@ def run_regret_experiment_pytorch( dataset,
           loss_final = float("inf")
           while loss_final > loss_initial + loss_confidence_band:
 
-            print("Recomputing .... ")
+            #print("Recomputing .... ")
 
             model_biased_prediction = train_model_counterfactual(model_biased_prediction, num_full_minimization_steps, biased_dataset, batch_size, batch_X, 
               counterfactual_regularizer = counterfactual_reg, verbose = False, restart_model_full_minimization = restart_model_full_minimization)
