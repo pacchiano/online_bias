@@ -104,13 +104,22 @@ class TorchBinaryLogisticRegression:
         for parameter in self.network.parameters():
           parameter.copy_(torch.normal(0,.1,parameter.shape))
 
-    def initialize_model(self, batch_X):
+    # def initialize_model(self, batch_X):
+    #   # if dim == None:
+    #   #if self.MLP:
+    #   if self.fit_intercept:
+    #         batch_X = self.__add_intercept(batch_X)
+    #   self.network = Feedforward(batch_X.shape[1], self.representation_layer_size, self.MLP)
+
+    def initialize_model(self, data_dim):
       # if dim == None:
       #if self.MLP:
-      if self.fit_intercept:
-            batch_X = self.__add_intercept(batch_X)
-      self.network = Feedforward(batch_X.shape[1], self.representation_layer_size, self.MLP)
-      
+      # if self.fit_intercept:
+      #       batch_X = self.__add_intercept(batch_X)
+      self.network  = Feedforward(data_dim + self.fit_intercept, self.representation_layer_size, self.MLP)
+      #self.network = Feedforward(batch_X.shape[1], self.representation_layer_size, self.MLP)
+
+            
       #self.initialize_gaussian()
 
 
@@ -167,6 +176,12 @@ class TorchBinaryLogisticRegression:
       #if len(batch_y) == 1:
 
       return self.criterion(torch.squeeze(prob_predictions,1), batch_y.float())
+
+
+
+
+
+
 
 
       #return self.criterion(torch.squeeze(prob_predictions), batch_y.float())

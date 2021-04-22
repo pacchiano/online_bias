@@ -28,26 +28,21 @@ from models import *
 import IPython
 
 
-def train_model(model, num_steps, train_dataset, batch_size, verbose = False):
+def train_model(model, num_steps, train_dataset, batch_size, verbose = False, restart_model_full_minimization = True):
 
   for i in range(num_steps):
     if verbose:
       print("train model iteration ", i)
     batch_X, batch_y = train_dataset.get_batch(batch_size)
     
-    #global_batch, protected_batches = get_batches( protected_datasets_train, train_dataset, batch_size) 
-    #batch_X, batch_y = global_batch
-
-
     if i ==0:
-      model.initialize_model(batch_X)           
+      if restart_model_full_minimization:
+        model.initialize_model(batch_X.shape[1])
+      #model.initialize_model(batch_X)           
       optimizer = torch.optim.SGD(model.network.parameters(), lr = 0.01)
 
-
-
     optimizer.zero_grad()
-    loss = model.get_loss(batch_X, batch_y)
-    
+    loss = model.get_loss(batch_X, batch_y)    
 
     loss.backward()
     optimizer.step()
@@ -56,29 +51,22 @@ def train_model(model, num_steps, train_dataset, batch_size, verbose = False):
 
 
 
-def train_model_counterfactual(model, num_steps, train_dataset, batch_size, query_batch, counterfactual_regularizer = 1, verbose = False):
+def train_model_counterfactual(model, num_steps, train_dataset, batch_size, query_batch, counterfactual_regularizer = 1, verbose = False, restart_model_full_minimization  = True ):
 
   for i in range(num_steps):
     if verbose:
       print("train model iteration ", i)
     batch_X, batch_y = train_dataset.get_batch(batch_size)
     
-    #global_batch, protected_batches = get_batches( protected_datasets_train, train_dataset, batch_size) 
-    #batch_X, batch_y = global_batch
-
-
     if i ==0:
-      model.initialize_model(batch_X)           
+      #model.initialize_model(batch_X)           
+      if restart_model_full_minimization:
+        model.initialize_model(batch_X.shape[1])
       optimizer = torch.optim.SGD(model.network.parameters(), lr = 0.01)
-
-
 
     optimizer.zero_grad()
     loss = model.get_loss(batch_X, batch_y) - counterfactual_regularizer*torch.mean(model.predict_prob(query_batch))
     
-    # IPython.embed()
-    # raise ValueError("asdflkm")
-
     loss.backward()
     optimizer.step()
 
@@ -108,7 +96,7 @@ def run_regret_experiment_pytorch( dataset,
     biased_threshold, 
     batch_size, 
     mahalanobis_regularizer, 
-    adjust_mahalanobis,
+    adjust_mahalanobis 
     epsilon_greedy, 
     epsilon, 
     alpha, 
@@ -122,13 +110,21 @@ def run_regret_experiment_pytorch( dataset,
     training_mode = "full_minimization",
     num_full_minimization_steps = 1000,
     decision_type = "counterfactual",
-    verbose = True):
+    verbose = True,
+    restart_model_full_minimization = False):
 
 
   protected_datasets_train, protected_datasets_test, train_dataset, test_dataset = get_dataset(dataset, batch_size, 1000)
   baseline_model = TorchBinaryLogisticRegression(random_init = random_init, fit_intercept=True, alpha = alpha, 
                 MLP = MLP, representation_layer_size = representation_layer_size)
   
+  if decision_type == "counterfactual" and epsilon_greedy:
+    raise ValueError("Decision type set to counterfactual and epsilon greedy set to True")
+  if decision_type == "counterfactual" and adjust_mahalanobis:
+    raise ValueError("Decision type set to counterfactual and adjust_mahalanobis set to True")
+
+
+
   if dataset == "MNIST":
     baseline_batch_size = batch_size
 
@@ -161,7 +157,6 @@ def run_regret_experiment_pytorch( dataset,
   counter = 0
   biased_data_totals = 0
 
-  colors = ["red", "green", "violet", "orange"]
 
   model =  TorchBinaryLogisticRegression(random_init = random_init, fit_intercept=True, alpha = alpha, MLP = MLP, representation_layer_size = representation_layer_size)
   model_biased = TorchBinaryLogisticRegression(random_init = random_init, fit_intercept=True, alpha = alpha, MLP = MLP, representation_layer_size =representation_layer_size)
@@ -172,52 +167,43 @@ def run_regret_experiment_pytorch( dataset,
   cummulative_data_covariance = [] 
   inverse_cummulative_data_covariance = []
 
-  #train_accuracies = []
   train_accuracies_biased = []
   timesteps = []
 
-  #IPython.embed()
 
   if training_mode == "full_minimization":
     biased_dataset = GrowingNumpyDataSet()
     unbiased_dataset = GrowingNumpyDataSet()
 
+
   while counter < max_num_steps:
     counter += 1 
 
-    ### Start of the logistic steps
     global_batch, protected_batches = get_batches( protected_datasets_train, train_dataset, batch_size) 
     batch_X, batch_y = global_batch
-    #global_prediction, protected_predictions = get_predictions(global_batch, protected_batches, model)
-    if counter ==1:
-      model.initialize_model(batch_X)
-      model_biased.initialize_model(batch_X)
-      if decision_type == "counterfactual":
-        model_biased_prediction.initialize_model(batch_X)
 
+    if counter ==1:
+      #model.initialize_model(batch_X)
+      model.initialize_model(batch_X.shape[1])
+      #model_biased.initialize_model(batch_X)
+      model_biased.initialize_model(batch_X.shape[1])
+      if decision_type == "counterfactual":
+        model_biased_prediction.initialize_model(batch_X.shape[1])
+        #model_biased_prediction.initialize_model(batch_X)
 
 
       optimizer_model = torch.optim.Adam(model.network.parameters(), lr = 0.01)
       optimizer_biased = torch.optim.Adam(model_biased.network.parameters(), lr = 0.01)
 
 
-
+    ### TRAIN THE UNBIASED MODEL
     if training_mode == "full_minimization":
       unbiased_dataset.add_data(batch_X, batch_y)      
-      model = train_model(model, num_full_minimization_steps, unbiased_dataset, batch_size)
+      model = train_model(model, num_full_minimization_steps, unbiased_dataset, batch_size, restart_model_full_minimization = restart_model_full_minimization)
 
 
     elif training_mode == "gradient_step":
       model, optimizer_model = gradient_step(model, optimizer_model, batch_X, batch_y)
-
-
-
-    # optimizer_model.zero_grad()
-    # loss = model.get_loss(batch_X, batch_y)
-    # loss.backward()
-    # optimizer_model.step()
-
-
 
   
     if decision_type == "simple":
@@ -230,7 +216,7 @@ def run_regret_experiment_pytorch( dataset,
           raise ValueError("The counterfactual decision mode is incompatible with all traning modes different from full_minimization")
         
         if biased_dataset.get_size() == 0:
-          ### ACCEPT ALL POINTS
+          ### ACCEPT ALL POINTS IF THE BIASED DATASET IS NOT INITIALIZED
           global_biased_prediction = [1 for _ in range(batch_size)]
 
         ### Evaluate the loss over the existing dataset.
@@ -241,12 +227,14 @@ def run_regret_experiment_pytorch( dataset,
             all_data_X, all_data_Y = biased_dataset.get_batch(10000000000)
             loss_initial = model_biased.get_loss(all_data_X, all_data_Y)
 
-          counterfactual_reg = 1
+          counterfactual_reg = 1 ## COUNTERFACTUAL REGULARIZATION
 
           loss_final = float("inf")
           while loss_final > 2*loss_initial:
 
-            model_biased_prediction = train_model_counterfactual(model_biased_prediction, num_full_minimization_steps, biased_dataset, batch_size, batch_X, counterfactual_regularizer = counterfactual_reg, verbose = False)
+
+            model_biased_prediction = train_model_counterfactual(model_biased_prediction, num_full_minimization_steps, biased_dataset, batch_size, batch_X, 
+              counterfactual_regularizer = counterfactual_reg, verbose = False, restart_model_full_minimization = restart_model_full_minimization)
             
 
             ##### EVALUATE THE EXPECTED LOSS ###  
@@ -258,39 +246,18 @@ def run_regret_experiment_pytorch( dataset,
           global_biased_prediction, _ = get_predictions(global_batch, protected_batches, model_biased_prediction)
 
 
-          # IPython.embed()
-          # if counter == 3:
-          #   raise ValueError("asldkfm")
-
-
-
     biased_batch_X = []
     biased_batch_y = []
     inverse_probabilities = []
     biased_batch_size = 0
-    #print("Global biased predictions ", global_biased_prediction)
     biased_train_accuracy = 0
     batch_regret = 0
 
     for i in range(len(global_biased_prediction)):
-      #if np.random.random() <= global_biased_prediction[i]:
       accept_point = global_biased_prediction[i] > biased_threshold or (epsilon_greedy and np.random.random() < epsilon)
-      #print(accept_point, " ", batch_y[i], accept_point == batch_y[i])
-      #if accept_point == 
-      # print("############")
-      # print("global biased prediction ", global_biased_prediction[i])
-      # print("accept point ", accept_point)
-      # print("batch y i ", batch_y[i])
-      # print("outcome ", accept_point == batch_y[i])
 
       biased_train_accuracy += (accept_point == batch_y[i])*1.0 
-      # import IPython
-      # IPython.embed()
-      # raise ValueError("asldkfm")
       if regret_wrt_baseline:      
-        # import IPython
-        # IPython.embed()
-        # raise ValueError("laksdmf")
         batch_regret += baseline_accuracy - (accept_point == batch_y[i])*1.0
 
       else:
@@ -300,87 +267,46 @@ def run_regret_experiment_pytorch( dataset,
           batch_regret += 1.0
 
       if accept_point:
-        #inverse_probabilities.append(1.0)#/global_biased_prediction[i])
         biased_batch_X.append(batch_X[i])
         biased_batch_y.append(batch_y[i])
         biased_batch_size += 1
-    #print("biased batch size ")
-    #print("biased batch size ", biased_batch_size)
     biased_batch_X = np.array(biased_batch_X)
     biased_batch_y = np.array(biased_batch_y)
-    # print(biased_train_accuracy)
-    # IPython.embed()
-    # raise ValueError("asdlfkm")
 
     biased_train_accuracy = biased_train_accuracy/len(global_biased_prediction)
     batch_regret = batch_regret/len(global_biased_prediction)*1.0
 
-
-
-
-    #inverse_probabilities = np.array(inverse_probabilities)
-
     biased_data_totals += biased_batch_size
+    
+
+
     ### Train biased model on biased data
-
-
-
-
     if biased_batch_size > 0:
-
-
       if training_mode == "full_minimization":
         biased_dataset.add_data(biased_batch_X, biased_batch_y)
-        model_biased = train_model(model_biased, num_full_minimization_steps, biased_dataset, batch_size)
+        model_biased = train_model(model_biased, num_full_minimization_steps, biased_dataset, batch_size, restart_model_full_minimization = restart_model_full_minimization)
 
-
-
-
-
-      # logistic_biased_gradient = model_biased.get_gradient(biased_batch_X, biased_batch_y,inverse_probabilities )
-      # biased_grad = logistic_learning_rate*logistic_biased_gradient
-      # model_biased.update(biased_grad, 1.0)
 
       elif training_mode == "gradient_step":
         model_biased, optimizer_biased = gradient_step(model_biased, optimizer_biased, biased_batch_X, biased_batch_y)
-
 
       else: 
         raise ValueError("Unrecognized training mode")
 
 
+      if decision_type == "simple":
+        representation_X =  model_biased.get_representation(biased_batch_X).detach()
+        representation_X = representation_X.numpy()
+        if adjust_mahalanobis:
+          if len(cummulative_data_covariance) == 0:
+            cummulative_data_covariance = np.dot(np.transpose(representation_X), representation_X)
+          else:
+            cummulative_data_covariance = mahalanobis_discount_factor*cummulative_data_covariance +  np.dot(np.transpose(representation_X), representation_X)
 
-
-      # optimizer_biased.zero_grad()
-      # #IPython.embed()
-      # #raise ValueError("asdlfkm")
-      # #print("biased batch X ", biased_batch_X, " biased batch y ", biased_batch_y)
-      # biased_loss = model_biased.get_loss(biased_batch_X, biased_batch_y)
-      # biased_loss.backward()
-      # optimizer_biased.step()
-      #model_biased.theta.detach()
-
-      #updated_batch_X = model_biased.update_batch(biased_batch_X)
-      representation_X =  model_biased.get_representation(biased_batch_X).detach()
-      # IPython.embed()
-      # raise ValueError("asdlkfm")
-      representation_X = representation_X.numpy()
-      # IPython.embed()
-      # raise ValueError("asdflkm")
-      if adjust_mahalanobis:
-        if len(cummulative_data_covariance) == 0:
-          cummulative_data_covariance = np.dot(np.transpose(representation_X), representation_X)
-        else:
-          cummulative_data_covariance = mahalanobis_discount_factor*cummulative_data_covariance +  np.dot(np.transpose(representation_X), representation_X)
-
-      #### This can be done instead by using the Sherman-Morrison Formula.
-        inverse_cummulative_data_covariance = torch.from_numpy(np.linalg.inv(mahalanobis_regularizer*np.eye(representation_X.shape[1])+ cummulative_data_covariance)).float()
-
-
-    
+          #### This can be done instead by using the Sherman-Morrison Formula.
+          inverse_cummulative_data_covariance = torch.from_numpy(np.linalg.inv(mahalanobis_regularizer*np.eye(representation_X.shape[1])+ cummulative_data_covariance)).float()
 
     #### DIAGNOSTICS ######
-
     ## Compute accuracy diagnostics
     if counter % logging_frequency*1.0 == 0:
       train_regret.append(batch_regret)
@@ -393,19 +319,13 @@ def run_regret_experiment_pytorch( dataset,
 
 
       #### Compute loss diagnostics
-
-
       biased_loss = model_biased.get_loss(batch_X_test, batch_y_test)
-
       loss = model.get_loss(batch_X_test, batch_y_test)
-
       loss_validation.append(loss.detach())
       loss_validation_biased.append(biased_loss.detach())
 
 
-
       accuracies_list.append(total_accuracy)
-
       biased_global_probabilities_list, biased_protected_predictions = get_predictions(global_batch_test, protected_batches_test, model_biased)
       biased_total_accuracy, biased_protected_accuracies = get_accuracies(global_batch_test, protected_batches_test, model_biased, threshold)
       biased_accuracies_list.append(biased_total_accuracy)
@@ -427,8 +347,7 @@ def run_regret_experiment_pytorch( dataset,
       train_biased_accuracies_cum_averages = np.cumsum(train_accuracies_biased)
       train_biased_accuracies_cum_averages = train_biased_accuracies_cum_averages/(np.arange(len(timesteps))+1)
       train_cum_regret = np.cumsum(train_regret)
-      #train_cum_regret = train_cum_regret/(np.arange(len(timesteps)) + 1)
-
+    
 
   return timesteps, test_biased_accuracies_cum_averages, accuracies_cum_averages, train_biased_accuracies_cum_averages, train_cum_regret, loss_validation, loss_validation_biased, loss_validation_baseline, baseline_accuracy
 
