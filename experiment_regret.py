@@ -96,7 +96,7 @@ def run_regret_experiment_pytorch( dataset,
     biased_threshold, 
     batch_size, 
     mahalanobis_regularizer, 
-    adjust_mahalanobis 
+    adjust_mahalanobis, 
     epsilon_greedy, 
     epsilon, 
     alpha, 
