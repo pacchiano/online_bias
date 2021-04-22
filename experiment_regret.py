@@ -39,7 +39,7 @@ def train_model(model, num_steps, train_dataset, batch_size, verbose = False, re
       if restart_model_full_minimization:
         model.initialize_model(batch_X.shape[1])
       #model.initialize_model(batch_X)           
-      optimizer = torch.optim.SGD(model.network.parameters(), lr = 0.01)
+      optimizer = torch.optim.Adam(model.network.parameters(), lr = 0.01)
 
     optimizer.zero_grad()
     loss = model.get_loss(batch_X, batch_y)    
@@ -62,7 +62,7 @@ def train_model_counterfactual(model, num_steps, train_dataset, batch_size, quer
       #model.initialize_model(batch_X)           
       if restart_model_full_minimization:
         model.initialize_model(batch_X.shape[1])
-      optimizer = torch.optim.SGD(model.network.parameters(), lr = 0.01)
+      optimizer = torch.optim.Adam(model.network.parameters(), lr = 0.01)
 
     optimizer.zero_grad()
     loss = model.get_loss(batch_X, batch_y) - counterfactual_regularizer*torch.mean(model.predict_prob(query_batch))
@@ -70,13 +70,25 @@ def train_model_counterfactual(model, num_steps, train_dataset, batch_size, quer
     loss.backward()
     optimizer.step()
 
+
   return model
 
 
 
 
+def compute_loss_confidence_band(num_loss_samples, model, num_steps, train_dataset, batch_size, verbose = False):
+    loss_values = []
+    for i in range(num_loss_samples):
+      #print("loss sample ", i)
+      model = train_model(model, num_steps, train_dataset, batch_size, verbose = False, restart_model_full_minimization = True)
+      all_data_X, all_data_Y = train_dataset.get_batch(10000000000)
+      with torch.no_grad():
+        loss = model.get_loss(all_data_X, all_data_Y)
+        loss_values.append(loss.detach())
 
-
+    # IPython.embed()
+    # raise ValueError("asdlfkm")
+    return np.std(loss_values)
 
 def gradient_step(model, optimizer, batch_X, batch_y):
 
@@ -111,7 +123,8 @@ def run_regret_experiment_pytorch( dataset,
     num_full_minimization_steps = 1000,
     decision_type = "counterfactual",
     verbose = True,
-    restart_model_full_minimization = False):
+    restart_model_full_minimization = False,
+    estimate_loss_confidence_band = True):
 
 
   protected_datasets_train, protected_datasets_test, train_dataset, test_dataset = get_dataset(dataset, batch_size, 1000)
@@ -226,12 +239,17 @@ def run_regret_experiment_pytorch( dataset,
           with torch.no_grad():
             all_data_X, all_data_Y = biased_dataset.get_batch(10000000000)
             loss_initial = model_biased.get_loss(all_data_X, all_data_Y)
+          if estimate_loss_confidence_band:
+            loss_confidence_band = 2*compute_loss_confidence_band(10, model_biased, num_full_minimization_steps, biased_dataset, batch_size, verbose = False)
+          else:
+            loss_confidence_band = loss_initial
 
           counterfactual_reg = 1 ## COUNTERFACTUAL REGULARIZATION
 
           loss_final = float("inf")
-          while loss_final > 2*loss_initial:
+          while loss_final > loss_initial + loss_confidence_band:
 
+            print("Recomputing .... ")
 
             model_biased_prediction = train_model_counterfactual(model_biased_prediction, num_full_minimization_steps, biased_dataset, batch_size, batch_X, 
               counterfactual_regularizer = counterfactual_reg, verbose = False, restart_model_full_minimization = restart_model_full_minimization)

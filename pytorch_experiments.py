@@ -30,11 +30,11 @@ from experiment_regret import *
 
 
 
-USE_RAY = True
+USE_RAY = False
 ray.init()
 
 
-@ray.remote
+#@ray.remote
 def run_experiment_parallel(dataset, logging_frequency, max_num_steps, logistic_learning_rate,threshold, biased_threshold, batch_size, 
 	random_init, fit_intercept, mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, representation_layer_size, baseline_steps, mahalanobis_discount_factor, training_mode, decision_type):
 
@@ -97,7 +97,7 @@ def run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_ra
 	if epsilon_greedy and adjust_mahalanobis:
 		raise ValueError("Both epsilon greedy and adjust mahalanobis are on!")
 
-	print("Starting Experiment T{} {} {} {} epsilongreedy {} epsilon {} adjmahalanobis {} mahreg {} alpha {}".format(max_num_steps,  training_mode, decision_type, network_type, epsilon_greedy, epsilon , adjust_mahalanobis, mahalanobis_regularizer, alpha ))
+	print("Starting Experiment {} T{} {} {} {} epsilongreedy {} epsilon {} adjmahalanobis {} mahreg {} alpha {}".format(dataset, max_num_steps,  training_mode, decision_type, network_type, epsilon_greedy, epsilon , adjust_mahalanobis, mahalanobis_regularizer, alpha ))
 	# IPython.embed()
 	# raise ValueError("asdlfkm")
 	if USE_RAY:
@@ -319,6 +319,11 @@ def main():
 
 
 		for MLP, representation_layer_size, training_mode, decision_type, adjust_mahalanobis, epsilon_greedy, epsilon, mahalanobis_discount_factor, mahalanobis_regularizer, alpha in all_params:
+			training_mode = "full_minimization"
+			decision_type = "counterfactual"
+			adjust_mahalanobis = False
+			epsilon_greedy = False
+
 			run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_rate, threshold, 
 						biased_threshold, batch_size, random_init, fit_intercept, num_experiments, 
 						mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, representation_layer_size, baseline_steps, mahalanobis_discount_factor, training_mode, decision_type)
