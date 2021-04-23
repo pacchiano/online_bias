@@ -302,7 +302,7 @@ def main():
 		random_init = True
 		fit_intercept = True
 
-		num_experiments = 10
+		num_experiments = 5
 
 		representation_layer_sizes = [10, 40, 100]
 		mahalanobis_discount_factors = [1, .9, .8]
