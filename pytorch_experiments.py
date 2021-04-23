@@ -30,11 +30,11 @@ from experiment_regret import *
 
 
 
-USE_RAY = False
+USE_RAY = True
 ray.init()
 
 
-#@ray.remote
+@ray.remote
 def run_experiment_parallel(dataset, logging_frequency, max_num_steps, logistic_learning_rate,threshold, biased_threshold, batch_size, 
 	random_init, fit_intercept, mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, representation_layer_size, baseline_steps, mahalanobis_discount_factor, training_mode, decision_type):
 
@@ -290,7 +290,7 @@ def run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_ra
 def main():
 
 	for dataset in [ "MultiSVM", "MNIST", "Adult"]:
-		training_modes = [ "full_minimization", "gradient_step"]
+		training_modes = [ "gradient_step"]#, "full_minimization"]
 
 		logging_frequency = 10
 		max_num_steps = 500
