@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 import numpy.random as npr
 from scipy.stats import wasserstein_distance, ks_2samp
 # from sklearn.linear_model import LogisticRegression
-
+import gc
 import torch
 
 from datasets import *
@@ -46,9 +46,43 @@ def train_model(model, num_steps, train_dataset, batch_size, verbose = False, re
 
     loss.backward()
     optimizer.step()
-
   return model
 
+
+
+def train_model_with_stopping(model, min_epoch_size, train_dataset, batch_size, verbose = False, restart_model_full_minimization = True, eps = .0001, max_epochs = 3):
+  curr_epoch_size = min_epoch_size
+  prev_loss_value = float("inf")
+
+  if restart_model_full_minimization:
+    batch_X, batch_y = train_dataset.get_batch(batch_size)
+    model.initialize_model(batch_X.shape[1])
+
+  curr_epoch_index = 0
+
+  while True:
+    model = train_model(model, curr_epoch_size, train_dataset, batch_size, verbose = False, restart_model_full_minimization = False)
+    train_batch = train_dataset.get_batch(1000)
+    with torch.no_grad():
+      curr_loss = model.get_loss(train_batch[0], train_batch[1])
+      curr_loss = curr_loss.detach()
+
+    if verbose:
+      print("Curr loss ", curr_loss, "Prev loss ", prev_loss_value)
+      
+    if curr_loss  < eps:#eps and prev_loss_value - eps < curr_loss:
+      #print("asdlfkmasdlfkmasdlkfmasldkfm", " Curr loss ", curr_loss, "Prev loss ", prev_loss_value)
+      return model
+
+    prev_loss_value = curr_loss.detach()
+    curr_epoch_size = 2*curr_epoch_size
+    curr_epoch_index+= 1
+    if curr_epoch_index == max_epochs:
+      curr_epoch_size = min_epoch_size
+      curr_epoch_index = 0
+      prev_loss_value = float("inf")   
+      batch_X, batch_y = train_dataset.get_batch(batch_size)
+      model.initialize_model(batch_X.shape[1])
 
 
 def train_model_counterfactual(model, num_steps, train_dataset, batch_size, query_batch, counterfactual_regularizer = 1, verbose = False, restart_model_full_minimization  = True ):
@@ -143,13 +177,14 @@ def run_regret_experiment_pytorch( dataset,
 
 
   baseline_model = train_model(baseline_model, baseline_steps, train_dataset, baseline_batch_size)
-
+  print("Finished training baseline model")
 
   with torch.no_grad():
     baseline_batch_test, protected_batches_test = get_batches(protected_datasets_test, test_dataset, 1000)
     baseline_accuracy, protected_accuracies = get_accuracies(baseline_batch_test, protected_batches_test, baseline_model, threshold)
     loss_validation_baseline = baseline_model.get_loss(baseline_batch_test[0], baseline_batch_test[1])
-    
+  
+  print("Baseline model accuracy {}".format(baseline_accuracy))    
 
   num_protected_groups = len(protected_datasets_train)
   wass_distances = [[] for _ in range(num_protected_groups)]
@@ -212,8 +247,10 @@ def run_regret_experiment_pytorch( dataset,
     ### TRAIN THE UNBIASED MODEL
     if training_mode == "full_minimization":
       unbiased_dataset.add_data(batch_X, batch_y)      
-      model = train_model(model, num_full_minimization_steps, unbiased_dataset, batch_size, restart_model_full_minimization = restart_model_full_minimization)
+      #model = train_model(model, num_full_minimization_steps, unbiased_dataset, batch_size, restart_model_full_minimization = restart_model_full_minimization)
+      model = train_model_with_stopping(model, num_full_minimization_steps, unbiased_dataset, batch_size, verbose = False, restart_model_full_minimization = restart_model_full_minimization, eps = .0001)
 
+      gc.collect()
 
     elif training_mode == "gradient_step":
       model, optimizer_model = gradient_step(model, optimizer_model, batch_X, batch_y)
@@ -241,6 +278,7 @@ def run_regret_experiment_pytorch( dataset,
             loss_initial = model_biased.get_loss(all_data_X, all_data_Y)
           if estimate_loss_confidence_band:
             loss_confidence_band = 2*compute_loss_confidence_band(10, model_biased, num_full_minimization_steps, biased_dataset, batch_size, verbose = False)
+            gc.collect()
           else:
             loss_confidence_band = loss_initial
 
@@ -253,7 +291,7 @@ def run_regret_experiment_pytorch( dataset,
 
             model_biased_prediction = train_model_counterfactual(model_biased_prediction,  num_full_minimization_steps, biased_dataset, batch_size, batch_X, 
               counterfactual_regularizer = counterfactual_reg, verbose = False, restart_model_full_minimization = restart_model_full_minimization)
-            
+            gc.collect()
 
             ##### EVALUATE THE EXPECTED LOSS ###  
             with torch.no_grad():
@@ -302,7 +340,11 @@ def run_regret_experiment_pytorch( dataset,
     if biased_batch_size > 0:
       if training_mode == "full_minimization":
         biased_dataset.add_data(biased_batch_X, biased_batch_y)
-        model_biased = train_model(model_biased, num_full_minimization_steps, biased_dataset, batch_size, restart_model_full_minimization = restart_model_full_minimization)
+        #model_biased = train_model(model_biased, num_full_minimization_steps, biased_dataset, batch_size, restart_model_full_minimization = restart_model_full_minimization)
+        model_biased = train_model_with_stopping(model_biased, num_full_minimization_steps, biased_dataset, batch_size, verbose = False, restart_model_full_minimization = restart_model_full_minimization, eps = .0001)
+        gc.collect()
+
+
 
 
       elif training_mode == "gradient_step":
@@ -335,12 +377,12 @@ def run_regret_experiment_pytorch( dataset,
       global_probabilities_list, protected_predictions = get_predictions(global_batch_test, protected_batches_test, model)
       total_accuracy, protected_accuracies = get_accuracies(global_batch_test, protected_batches_test, model, threshold)
 
-
-      #### Compute loss diagnostics
-      biased_loss = model_biased.get_loss(batch_X_test, batch_y_test)
-      loss = model.get_loss(batch_X_test, batch_y_test)
-      loss_validation.append(loss.detach())
-      loss_validation_biased.append(biased_loss.detach())
+      with torch.no_grad():
+        #### Compute loss diagnostics
+        biased_loss = model_biased.get_loss(batch_X_test, batch_y_test)
+        loss = model.get_loss(batch_X_test, batch_y_test)
+        loss_validation.append(loss.detach())
+        loss_validation_biased.append(biased_loss.detach())
 
 
       accuracies_list.append(total_accuracy)
@@ -348,15 +390,34 @@ def run_regret_experiment_pytorch( dataset,
       biased_total_accuracy, biased_protected_accuracies = get_accuracies(global_batch_test, protected_batches_test, model_biased, threshold)
       biased_accuracies_list.append(biased_total_accuracy)
 
+
+      #### Compute training biased accuracy
+      train_biased_batch = biased_dataset.get_batch(1000)
+      biased_train_accuracy = get_accuracies_simple(train_biased_batch,  model_biased , threshold)
+      with torch.no_grad():
+        loss_train_biased = model_biased.get_loss(train_biased_batch[0], train_biased_batch[1])
+        loss_train_biased = loss_train_biased.detach()
+
+
+
       if verbose:
+        # IPython.embed()
+        # raise ValueError("as;kdfm")
         print("Iteration {}".format(counter))
         print("Total proportion of biased data {}".format(1.0*biased_data_totals/(batch_size*counter)))
+        print("Biased TRAIN accuracy  ", biased_train_accuracy)
+        print("Biased TRAIN loss ", loss_train_biased)
 
+        print("                                                               Baseline accuracy ", baseline_accuracy)
         ### Compute the global accuracy. 
-        print("                                                               Accuracy ", total_accuracy)
+        print("                                                               Unbiased Accuracy ", total_accuracy)
                   
         ### Compute the global accuracy. 
         print("                                                               Biased Accuracy ", biased_total_accuracy)
+
+        print("                                                               Validation Loss Unbiased ", loss_validation[-1] )
+
+        print("                                                               Validation Loss Biased ", loss_validation_biased[-1])
 
       test_biased_accuracies_cum_averages = np.cumsum(biased_accuracies_list)
       test_biased_accuracies_cum_averages = test_biased_accuracies_cum_averages/(np.arange(len(timesteps))+1)

@@ -267,6 +267,15 @@ def get_accuracies(global_batch, protected_batches, model, threshold):
       batch_X, batch_y = global_batch
 
       accuracies_list = model.get_accuracy(batch_X, batch_y, threshold)
+
       protected_accuracies_list= [model.get_accuracy(protected_batch[0], protected_batch[1], threshold) for protected_batch in protected_batches ]
       return accuracies_list, protected_accuracies_list
+
+def get_accuracies_simple(global_batch, model, threshold):
+      batch_X, batch_y = global_batch
+
+      accuracies_list = model.get_accuracy(batch_X, batch_y, threshold)
+      
+      return accuracies_list
+
 

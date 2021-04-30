@@ -290,7 +290,7 @@ def run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_ra
 def main():
 
 	for dataset in [ "MultiSVM", "MNIST", "Adult"]:
-		training_modes = [ "gradient_step"]#, "full_minimization"]
+		training_modes = [ "full_minimization", "gradient_step"]#, "full_minimization"]
 
 		logging_frequency = 10
 		max_num_steps = 500
@@ -310,7 +310,7 @@ def main():
 		epsilons = [.1, .2, .5]
 		alphas = [1, 4]
 
-		MLP_and_layer_sizes = list(itertools.product([True], representation_layer_sizes)) + [(False, None)]
+		MLP_and_layer_sizes = [(False, None)] + list(itertools.product([True], representation_layer_sizes))
 		trainmodes_decision_type_adjmahalanobis_epsgreedy_epsilon_mahdisc_mahreg_alpha = list(itertools.product(training_modes, ["simple"], [False], [True], epsilons, [0], [0], [0] )) + list(itertools.product(training_modes, ["simple"], [True], [False], [0], mahalanobis_discount_factors, mahalanobis_reguarizers, alphas ))
 		trainmodes_decision_type_adjmahalanobis_epsgreedy_epsilon_mahdisc_mahreg_alpha += [("full_minimization", "counterfactual", False, False, 0, 0, 0, 0) ]
 
@@ -319,15 +319,20 @@ def main():
 
 
 		for MLP, representation_layer_size, training_mode, decision_type, adjust_mahalanobis, epsilon_greedy, epsilon, mahalanobis_discount_factor, mahalanobis_regularizer, alpha in all_params:
-			# training_mode = "full_minimization"
-			# decision_type = "counterfactual"
-			# adjust_mahalanobis = False
-			# epsilon_greedy = False
+			training_mode = "full_minimization"
+			decision_type = "simple"
+			adjust_mahalanobis = False
+			epsilon_greedy = True
+			epsilon = .1
+			MLP = True
+			representation_layer_size = 10
+
 
 			run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_rate, threshold, 
 						biased_threshold, batch_size, random_init, fit_intercept, num_experiments, 
 						mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, representation_layer_size, baseline_steps, mahalanobis_discount_factor, training_mode, decision_type)
 
+			raise ValueError("Asdlfkm")
 
 
 main()
