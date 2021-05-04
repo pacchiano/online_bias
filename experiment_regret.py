@@ -59,6 +59,7 @@ def train_model_with_stopping(model, min_epoch_size, train_dataset, batch_size, 
     model.initialize_model(batch_X.shape[1])
 
   curr_epoch_index = 0
+  total_num_steps = 0
 
   while True:
     model = train_model(model, curr_epoch_size, train_dataset, batch_size, verbose = False, restart_model_full_minimization = False)
@@ -73,11 +74,12 @@ def train_model_with_stopping(model, min_epoch_size, train_dataset, batch_size, 
     if curr_loss  < eps:#eps and prev_loss_value - eps < curr_loss:
       #print("asdlfkmasdlfkmasdlkfmasldkfm", " Curr loss ", curr_loss, "Prev loss ", prev_loss_value)
       return model
-
     prev_loss_value = curr_loss.detach()
     curr_epoch_size = 2*curr_epoch_size
     curr_epoch_index+= 1
+    total_num_steps += 1
     if curr_epoch_index == max_epochs:
+      print("Curr epoch index ",curr_epoch_index, "total num steps", total_num_steps)
       curr_epoch_size = min_epoch_size
       curr_epoch_index = 0
       prev_loss_value = float("inf")   

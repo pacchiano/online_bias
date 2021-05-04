@@ -32,8 +32,6 @@ from experiment_regret import *
 
 USE_RAY = True
 ray.init()
-
-
 @ray.remote
 def run_experiment_parallel(dataset, logging_frequency, max_num_steps, logistic_learning_rate,threshold, biased_threshold, batch_size, 
 	random_init, fit_intercept, mahalanobis_regularizer, adjust_mahalanobis, epsilon_greedy, epsilon, alpha, MLP, representation_layer_size, baseline_steps, mahalanobis_discount_factor, training_mode, decision_type):
