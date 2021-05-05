@@ -318,10 +318,10 @@ def main():
 
 		for MLP, representation_layer_size, training_mode, decision_type, adjust_mahalanobis, epsilon_greedy, epsilon, mahalanobis_discount_factor, mahalanobis_regularizer, alpha in all_params:
 			training_mode = "full_minimization"
-			decision_type = "simple"
+			decision_type = "counterfactual"
 			adjust_mahalanobis = False
-			epsilon_greedy = True
-			epsilon = .1
+			epsilon_greedy = False
+			epsilon = 0
 			MLP = True
 			representation_layer_size = 10
 
