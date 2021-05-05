@@ -74,18 +74,25 @@ def train_model_with_stopping(model, min_epoch_size, train_dataset, batch_size, 
     if curr_loss  < eps:#eps and prev_loss_value - eps < curr_loss:
       #print("asdlfkmasdlfkmasdlkfmasldkfm", " Curr loss ", curr_loss, "Prev loss ", prev_loss_value)
       return model
+    
     prev_loss_value = curr_loss.detach()
+    total_num_steps += curr_epoch_size
+
     curr_epoch_size = 2*curr_epoch_size
+    
     curr_epoch_index+= 1
-    total_num_steps += 1
-    if curr_epoch_index == max_epochs:
+    
+    if curr_epoch_index%max_epochs == 0:
       print("Curr epoch index ",curr_epoch_index, "total num steps", total_num_steps)
       curr_epoch_size = min_epoch_size
       curr_epoch_index = 0
       prev_loss_value = float("inf")   
       batch_X, batch_y = train_dataset.get_batch(batch_size)
       model.initialize_model(batch_X.shape[1])
-
+      with torch.no_grad():
+        curr_loss = model.get_loss(train_batch[0], train_batch[1])
+        curr_loss = curr_loss.detach()
+      print("Curr loss ", curr_loss)
 
 def train_model_counterfactual(model, num_steps, train_dataset, batch_size, query_batch, counterfactual_regularizer = 1, verbose = False, restart_model_full_minimization  = True ):
 
