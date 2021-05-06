@@ -163,10 +163,10 @@ def train_model_counterfactual_with_stopping(model, loss_initial, loss_confidenc
 
 
 
-def compute_loss_confidence_band_with_stopping(num_loss_samples, model, min_epoch_size, train_dataset, batch_size, bottom_half = False):
+def compute_loss_confidence_band_with_stopping(num_loss_samples, model, min_epoch_size, train_dataset, batch_size, bottom_half = False, eps = .0001):
     loss_values = []
     for i in range(num_loss_samples):
-      model = train_model_with_stopping(model, min_epoch_size, train_dataset, batch_size, verbose = True, restart_model_full_minimization = True, eps = 0.0001, max_epochs = 5 )
+      model = train_model_with_stopping(model, min_epoch_size, train_dataset, batch_size, verbose = True, restart_model_full_minimization = True, eps = eps, max_epochs = 6 )
       #model = train_model(model, num_steps, train_dataset, batch_size, verbose = False, restart_model_full_minimization = True)
       all_data_X, all_data_Y = train_dataset.get_batch(10000000000)
       with torch.no_grad():
@@ -323,7 +323,8 @@ def run_regret_experiment_pytorch( dataset,
       unbiased_dataset.add_data(batch_X, batch_y)      
       #model = train_model(model, num_full_minimization_steps, unbiased_dataset, batch_size, restart_model_full_minimization = restart_model_full_minimization)
       print("Start of full minimization training of the unbiased model -- iteration ", counter)
-      model = train_model_with_stopping(model, num_full_minimization_steps, unbiased_dataset, batch_size, verbose = True, restart_model_full_minimization = restart_model_full_minimization, eps = .0001)
+      model = train_model_with_stopping(model, num_full_minimization_steps, unbiased_dataset, batch_size, verbose = True, 
+        restart_model_full_minimization = restart_model_full_minimization, eps = .0001*np.log(counter +2)/2)
 
       gc.collect()
 
@@ -353,9 +354,10 @@ def run_regret_experiment_pytorch( dataset,
             loss_initial = model_biased.get_loss(all_data_X, all_data_Y)
           if estimate_loss_confidence_band:
             print("Starting computation of the loss confidence band ")
-            loss_confidence_band, mean_loss_confidence_band = compute_loss_confidence_band_with_stopping(10, model_biased, num_full_minimization_steps, biased_dataset, batch_size, bottom_half = True)
+            loss_confidence_band, mean_loss_confidence_band = compute_loss_confidence_band_with_stopping(10, model_biased, num_full_minimization_steps, biased_dataset, 
+              batch_size, bottom_half = True, eps = .0001*np.log(counter +2)/2 )
             loss_confidence_band *= 2
-            loss_confidence_band += .0001
+            loss_confidence_band += .0001*np.log(counter +2)/2
             #loss_confidence_band = 2*compute_loss_confidence_band(10, model_biased, num_full_minimization_steps, biased_dataset, batch_size, verbose = False)
             gc.collect()
           else:
@@ -363,7 +365,9 @@ def run_regret_experiment_pytorch( dataset,
 
           counterfactual_reg = 1 ## COUNTERFACTUAL REGULARIZATION
 
-          model_biased_prediction = train_model_counterfactual_with_stopping(model_biased_prediction, loss_initial, loss_confidence_band, num_full_minimization_steps, biased_dataset, batch_X, batch_size, counterfactual_reg, verbose = False, restart_model_full_minimization = False  )
+          model_biased_prediction = train_model_counterfactual_with_stopping(model_biased_prediction, loss_initial, loss_confidence_band, 
+            num_full_minimization_steps, biased_dataset, batch_X, batch_size, counterfactual_reg, verbose = False, 
+            restart_model_full_minimization = False  )
 
           # loss_final = float("inf")
 
@@ -424,7 +428,8 @@ def run_regret_experiment_pytorch( dataset,
       if training_mode == "full_minimization":
         biased_dataset.add_data(biased_batch_X, biased_batch_y)
         #model_biased = train_model(model_biased, num_full_minimization_steps, biased_dataset, batch_size, restart_model_full_minimization = restart_model_full_minimization)
-        model_biased = train_model_with_stopping(model_biased, num_full_minimization_steps, biased_dataset, batch_size, verbose = True, restart_model_full_minimization = restart_model_full_minimization, eps = .0001)
+        model_biased = train_model_with_stopping(model_biased, num_full_minimization_steps, biased_dataset, batch_size, verbose = True, 
+          restart_model_full_minimization = restart_model_full_minimization, eps = .0001*np.log(counter +2)/2)
         gc.collect()
 
 
