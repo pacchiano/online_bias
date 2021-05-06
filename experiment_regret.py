@@ -345,7 +345,7 @@ def run_regret_experiment_pytorch( dataset,
             print("Starting computation of the loss confidence band ")
             loss_confidence_band, mean_loss_confidence_band = compute_loss_confidence_band_with_stopping(10, model_biased, num_full_minimization_steps, biased_dataset, batch_size, bottom_half = True)
             loss_confidence_band *= 2
-            loss_confidence_band += .0001
+            loss_confidence_band += .001
             #loss_confidence_band = 2*compute_loss_confidence_band(10, model_biased, num_full_minimization_steps, biased_dataset, batch_size, verbose = False)
             gc.collect()
           else:
