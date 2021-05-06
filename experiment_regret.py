@@ -315,7 +315,7 @@ def run_regret_experiment_pytorch( dataset,
     if training_mode == "full_minimization":
       unbiased_dataset.add_data(batch_X, batch_y)      
       #model = train_model(model, num_full_minimization_steps, unbiased_dataset, batch_size, restart_model_full_minimization = restart_model_full_minimization)
-      print("Start of full minimization training of the unbiased model")
+      print("Start of full minimization training of the unbiased model -- iteration ", counter)
       model = train_model_with_stopping(model, num_full_minimization_steps, unbiased_dataset, batch_size, verbose = True, restart_model_full_minimization = restart_model_full_minimization, eps = .0001)
 
       gc.collect()
