@@ -117,7 +117,7 @@ def train_model_counterfactual(model, num_steps, train_dataset, batch_size, quer
   return model
 
 
-def train_model_counterfactual_with_stopping(model, loss_initial, loss_confidence_band, epoch_size, train_dataset, query_batch, batch_size, counterfactual_reg, verbose = False, restart_model_full_minimization = False , max_epochs = 5 ):
+def train_model_counterfactual_with_stopping(model, loss_initial, loss_confidence_band, epoch_size, train_dataset, query_batch, batch_size, counterfactual_reg, verbose = False, restart_model_full_minimization = False , max_epochs = 6 ):
     loss_final = float("inf")
     all_data_X, all_data_Y = train_dataset.get_batch(10000000000)
 
@@ -348,7 +348,7 @@ def run_regret_experiment_pytorch( dataset,
             print("Starting computation of the loss confidence band ")
             loss_confidence_band, mean_loss_confidence_band = compute_loss_confidence_band_with_stopping(10, model_biased, num_full_minimization_steps, biased_dataset, batch_size, bottom_half = True)
             loss_confidence_band *= 2
-            loss_confidence_band += .001
+            loss_confidence_band += .0001
             #loss_confidence_band = 2*compute_loss_confidence_band(10, model_biased, num_full_minimization_steps, biased_dataset, batch_size, verbose = False)
             gc.collect()
           else:
