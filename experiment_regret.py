@@ -50,7 +50,7 @@ def train_model(model, num_steps, train_dataset, batch_size, verbose = False, re
 
 
 
-def train_model_with_stopping(model, min_epoch_size, train_dataset, batch_size, verbose = False, restart_model_full_minimization = True, eps = .0001, max_epochs = 3):
+def train_model_with_stopping(model, min_epoch_size, train_dataset, batch_size, verbose = False, restart_model_full_minimization = True, eps = .0001, max_epochs = 5):
   curr_epoch_size = min_epoch_size
   prev_loss_value = float("inf")
 
@@ -69,7 +69,7 @@ def train_model_with_stopping(model, min_epoch_size, train_dataset, batch_size, 
       curr_loss = curr_loss.detach()
 
     if verbose:
-      print("Curr loss ", curr_loss, "Prev loss ", prev_loss_value)
+      print("Curr loss ", curr_loss, "Prev loss ", prev_loss_value, " epoch ", curr_epoch_index, " total num steps ", total_num_steps)
       
     if curr_loss  < eps:#eps and prev_loss_value - eps < curr_loss:
       #print("asdlfkmasdlfkmasdlkfmasldkfm", " Curr loss ", curr_loss, "Prev loss ", prev_loss_value)
@@ -92,7 +92,7 @@ def train_model_with_stopping(model, min_epoch_size, train_dataset, batch_size, 
       with torch.no_grad():
         curr_loss = model.get_loss(train_batch[0], train_batch[1])
         curr_loss = curr_loss.detach()
-      print("Curr loss ", curr_loss)
+      print("Curr loss after restart ", curr_loss)
 
 def train_model_counterfactual(model, num_steps, train_dataset, batch_size, query_batch, counterfactual_regularizer = 1, verbose = False, restart_model_full_minimization  = True ):
 
@@ -117,9 +117,62 @@ def train_model_counterfactual(model, num_steps, train_dataset, batch_size, quer
   return model
 
 
+def train_model_counterfactual_with_stopping(model, loss_initial, loss_confidence_band, epoch_size, train_dataset, query_batch, batch_size, counterfactual_reg, verbose = False, restart_model_full_minimization = False , max_epochs = 5 ):
+    loss_final = float("inf")
+    all_data_X, all_data_Y = train_dataset.get_batch(10000000000)
 
 
-def compute_loss_confidence_band(num_loss_samples, model, num_steps, train_dataset, batch_size, verbose = False):
+    curr_epoch_index = 0
+    initial_counterfactual_reg = counterfactual_reg
+
+    while loss_final > loss_initial + loss_confidence_band:
+
+      #print("Recomputing .... ")
+      print("Start training of conterfactual model", "loss initial ", loss_initial, " loss confidence band ", loss_confidence_band, " loss_final ", loss_final)
+      model = train_model_counterfactual(model,  epoch_size, train_dataset, batch_size, query_batch, 
+                counterfactual_regularizer = counterfactual_reg, verbose = False, restart_model_full_minimization = False)
+      gc.collect()
+
+
+      counterfactual_reg *= .5*counterfactual_reg
+      curr_epoch_index += 1
+      print("Counterfactual epoch ", curr_epoch_index)
+
+      if curr_epoch_index%max_epochs == 0:
+        counterfactual_reg = initial_counterfactual_reg
+        model.initialize_model(query_batch.shape[1])
+
+      ##### EVALUATE THE EXPECTED LOSS ###  
+      with torch.no_grad():
+          loss_final = model.get_loss(all_data_X, all_data_Y)
+
+    print("Start training of conterfactual model", "loss initial ", loss_initial, " loss confidence band ", loss_confidence_band, " loss_final ", loss_final)
+
+    return model
+
+
+
+
+def compute_loss_confidence_band_with_stopping(num_loss_samples, model, min_epoch_size, train_dataset, batch_size, bottom_half = False):
+    loss_values = []
+    for i in range(num_loss_samples):
+      model = train_model_with_stopping(model, min_epoch_size, train_dataset, batch_size, verbose = True, restart_model_full_minimization = True, eps = 0.0001, max_epochs = 5 )
+      #model = train_model(model, num_steps, train_dataset, batch_size, verbose = False, restart_model_full_minimization = True)
+      all_data_X, all_data_Y = train_dataset.get_batch(10000000000)
+      with torch.no_grad():
+        loss = model.get_loss(all_data_X, all_data_Y)
+        loss_values.append(loss.detach())
+
+    # IPython.embed()
+    # raise ValueError("asdflkm")
+    if bottom_half:
+      loss_values.sort()
+      loss_values = loss_values[0:int(len(loss_values)/2)]  
+    return np.std(loss_values), np.mean(loss_values)
+
+
+
+def compute_loss_confidence_band(num_loss_samples, model, num_steps, train_dataset, batch_size, verbose = False, bottom_half = False):
     loss_values = []
     for i in range(num_loss_samples):
       #print("loss sample ", i)
@@ -129,8 +182,10 @@ def compute_loss_confidence_band(num_loss_samples, model, num_steps, train_datas
         loss = model.get_loss(all_data_X, all_data_Y)
         loss_values.append(loss.detach())
 
-    # IPython.embed()
-    # raise ValueError("asdlfkm")
+    if bottom_half:
+      loss_values.sort()
+      loss_values = loss_values[0:int(len(loss_values)/2)]  
+
     return np.std(loss_values)
 
 def gradient_step(model, optimizer, batch_X, batch_y):
@@ -163,10 +218,10 @@ def run_regret_experiment_pytorch( dataset,
     representation_layer_size = 10,
     mahalanobis_discount_factor = 1,
     training_mode = "full_minimization",
-    num_full_minimization_steps = 2000,
+    num_full_minimization_steps = 200,
     decision_type = "counterfactual",
     verbose = True,
-    restart_model_full_minimization = False,
+    restart_model_full_minimization = True,
     estimate_loss_confidence_band = True):
 
 
@@ -257,6 +312,7 @@ def run_regret_experiment_pytorch( dataset,
     if training_mode == "full_minimization":
       unbiased_dataset.add_data(batch_X, batch_y)      
       #model = train_model(model, num_full_minimization_steps, unbiased_dataset, batch_size, restart_model_full_minimization = restart_model_full_minimization)
+      print("Start of full minimization training of the unbiased model")
       model = train_model_with_stopping(model, num_full_minimization_steps, unbiased_dataset, batch_size, verbose = False, restart_model_full_minimization = restart_model_full_minimization, eps = .0001)
 
       gc.collect()
@@ -286,29 +342,37 @@ def run_regret_experiment_pytorch( dataset,
             all_data_X, all_data_Y = biased_dataset.get_batch(10000000000)
             loss_initial = model_biased.get_loss(all_data_X, all_data_Y)
           if estimate_loss_confidence_band:
-            loss_confidence_band = 2*compute_loss_confidence_band(10, model_biased, num_full_minimization_steps, biased_dataset, batch_size, verbose = False)
+            print("Starting computation of the loss confidence band ")
+            loss_confidence_band, mean_loss_confidence_band = compute_loss_confidence_band_with_stopping(10, model_biased, num_full_minimization_steps, biased_dataset, batch_size, bottom_half = True)
+            loss_confidence_band *= 2
+            loss_confidence_band += .0001
+            #loss_confidence_band = 2*compute_loss_confidence_band(10, model_biased, num_full_minimization_steps, biased_dataset, batch_size, verbose = False)
             gc.collect()
           else:
             loss_confidence_band = loss_initial
 
           counterfactual_reg = 1 ## COUNTERFACTUAL REGULARIZATION
 
-          loss_final = float("inf")
-          while loss_final > loss_initial + loss_confidence_band:
+          model_biased_prediction = train_model_counterfactual_with_stopping(model_biased_prediction, loss_initial, loss_confidence_band, num_full_minimization_steps, biased_dataset, batch_X, batch_size, counterfactual_reg, verbose = False, restart_model_full_minimization = False  )
 
-            #print("Recomputing .... ")
+          # loss_final = float("inf")
 
-            model_biased_prediction = train_model_counterfactual(model_biased_prediction,  num_full_minimization_steps, biased_dataset, batch_size, batch_X, 
-              counterfactual_regularizer = counterfactual_reg, verbose = False, restart_model_full_minimization = restart_model_full_minimization)
-            gc.collect()
+          # while loss_final > loss_initial + loss_confidence_band:
 
-            ##### EVALUATE THE EXPECTED LOSS ###  
-            with torch.no_grad():
-              loss_final = model_biased_prediction.get_loss(all_data_X, all_data_Y)
+          #   #print("Recomputing .... ")
+          #   print("Start training of conterfactual model", "loss initial ", loss_initial, " loss confidence band ", loss_confidence_band, " loss_final ", loss_final)
+          #   model_biased_prediction = train_model_counterfactual(model_biased_prediction,  num_full_minimization_steps, biased_dataset, batch_size, batch_X, 
+          #     counterfactual_regularizer = counterfactual_reg, verbose = False, restart_model_full_minimization = False)
+          #   gc.collect()
 
-            counterfactual_reg *= .5*counterfactual_reg
+          #   ##### EVALUATE THE EXPECTED LOSS ###  
+          #   with torch.no_grad():
+          #     loss_final = model_biased_prediction.get_loss(all_data_X, all_data_Y)
+
+          #   counterfactual_reg *= .5*counterfactual_reg
 
           global_biased_prediction, _ = get_predictions(global_batch, protected_batches, model_biased_prediction)
+          print("Global biased prediction ", global_biased_prediction)
 
 
     biased_batch_X = []

@@ -30,7 +30,7 @@ from experiment_regret import *
 
 
 
-USE_RAY = True
+USE_RAY = True#False
 ray.init()
 @ray.remote
 def run_experiment_parallel(dataset, logging_frequency, max_num_steps, logistic_learning_rate,threshold, biased_threshold, batch_size, 
