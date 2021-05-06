@@ -50,7 +50,7 @@ def train_model(model, num_steps, train_dataset, batch_size, verbose = False, re
 
 
 
-def train_model_with_stopping(model, min_epoch_size, train_dataset, batch_size, verbose = False, restart_model_full_minimization = True, eps = .0001, max_epochs = 7):
+def train_model_with_stopping(model, min_epoch_size, train_dataset, batch_size, verbose = False, restart_model_full_minimization = True, eps = .0001, max_epochs = 7, eps_epoch_cycle = 30):
   curr_epoch_size = min_epoch_size
   prev_loss_value = float("inf")
 
@@ -82,6 +82,9 @@ def train_model_with_stopping(model, min_epoch_size, train_dataset, batch_size, 
     
     curr_epoch_index+= 1
     
+    if curr_epoch_index%eps_epoch_cycle == 0:
+      eps *= 2
+
     if curr_epoch_index%max_epochs == 0:
       print("Curr epoch index ",curr_epoch_index, "total num steps", total_num_steps)
       curr_epoch_size = min_epoch_size
@@ -117,7 +120,8 @@ def train_model_counterfactual(model, num_steps, train_dataset, batch_size, quer
   return model
 
 
-def train_model_counterfactual_with_stopping(model, loss_initial, loss_confidence_band, epoch_size, train_dataset, query_batch, batch_size, counterfactual_reg, verbose = False, restart_model_full_minimization = False , max_epochs = 6 ):
+def train_model_counterfactual_with_stopping(model, loss_initial, loss_confidence_band, epoch_size, train_dataset, query_batch, batch_size, 
+  counterfactual_reg, verbose = False, restart_model_full_minimization = False , max_epochs = 6, eps_epoch_cycle = 30 ):
     loss_final = float("inf")
     all_data_X, all_data_Y = train_dataset.get_batch(10000000000)
 
@@ -139,6 +143,9 @@ def train_model_counterfactual_with_stopping(model, loss_initial, loss_confidenc
       curr_epoch_index += 1
       epoch_size *= 2
       print("Counterfactual epoch ", curr_epoch_index)
+
+      if curr_epoch_index%eps_epoch_cycle == 0:
+        loss_confidence_band*= 2
 
       if curr_epoch_index%max_epochs == 0:
         counterfactual_reg = initial_counterfactual_reg
