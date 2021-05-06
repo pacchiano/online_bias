@@ -85,7 +85,7 @@ def train_model_with_stopping(model, min_epoch_size, train_dataset, batch_size, 
     if curr_epoch_index%max_epochs == 0:
       print("Curr epoch index ",curr_epoch_index, "total num steps", total_num_steps)
       curr_epoch_size = min_epoch_size
-      curr_epoch_index = 0
+      #curr_epoch_index = 0
       prev_loss_value = float("inf")   
       batch_X, batch_y = train_dataset.get_batch(batch_size)
       model.initialize_model(batch_X.shape[1])
@@ -316,7 +316,7 @@ def run_regret_experiment_pytorch( dataset,
       unbiased_dataset.add_data(batch_X, batch_y)      
       #model = train_model(model, num_full_minimization_steps, unbiased_dataset, batch_size, restart_model_full_minimization = restart_model_full_minimization)
       print("Start of full minimization training of the unbiased model")
-      model = train_model_with_stopping(model, num_full_minimization_steps, unbiased_dataset, batch_size, verbose = False, restart_model_full_minimization = restart_model_full_minimization, eps = .0001)
+      model = train_model_with_stopping(model, num_full_minimization_steps, unbiased_dataset, batch_size, verbose = True, restart_model_full_minimization = restart_model_full_minimization, eps = .0001)
 
       gc.collect()
 
@@ -417,7 +417,7 @@ def run_regret_experiment_pytorch( dataset,
       if training_mode == "full_minimization":
         biased_dataset.add_data(biased_batch_X, biased_batch_y)
         #model_biased = train_model(model_biased, num_full_minimization_steps, biased_dataset, batch_size, restart_model_full_minimization = restart_model_full_minimization)
-        model_biased = train_model_with_stopping(model_biased, num_full_minimization_steps, biased_dataset, batch_size, verbose = False, restart_model_full_minimization = restart_model_full_minimization, eps = .0001)
+        model_biased = train_model_with_stopping(model_biased, num_full_minimization_steps, biased_dataset, batch_size, verbose = True, restart_model_full_minimization = restart_model_full_minimization, eps = .0001)
         gc.collect()
 
 
