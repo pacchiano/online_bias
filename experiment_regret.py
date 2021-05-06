@@ -124,6 +124,7 @@ def train_model_counterfactual_with_stopping(model, loss_initial, loss_confidenc
 
     curr_epoch_index = 0
     initial_counterfactual_reg = counterfactual_reg
+    initial_epoch_size = epoch_size
 
     while loss_final > loss_initial + loss_confidence_band:
 
@@ -136,10 +137,12 @@ def train_model_counterfactual_with_stopping(model, loss_initial, loss_confidenc
 
       counterfactual_reg *= .5*counterfactual_reg
       curr_epoch_index += 1
+      epoch_size *= 2
       print("Counterfactual epoch ", curr_epoch_index)
 
       if curr_epoch_index%max_epochs == 0:
         counterfactual_reg = initial_counterfactual_reg
+        epoch_size = initial_epoch_size
         model.initialize_model(query_batch.shape[1])
 
       ##### EVALUATE THE EXPECTED LOSS ###  
