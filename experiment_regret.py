@@ -50,7 +50,7 @@ def train_model(model, num_steps, train_dataset, batch_size, verbose = False, re
 
 
 
-def train_model_with_stopping(model, min_epoch_size, train_dataset, batch_size, verbose = False, restart_model_full_minimization = True, eps = .0001, max_epochs = 5):
+def train_model_with_stopping(model, min_epoch_size, train_dataset, batch_size, verbose = False, restart_model_full_minimization = True, eps = .0001, max_epochs = 6):
   curr_epoch_size = min_epoch_size
   prev_loss_value = float("inf")
 
