@@ -287,11 +287,11 @@ def run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_ra
 
 def main():
 
-	for dataset in [ "MultiSVM", "MNIST", "Adult"]:
+	for dataset in [  "MultiSVM", "Adult", "MNIST",]:
 		training_modes = [ "full_minimization", "gradient_step"]#, "full_minimization"]
 
 		logging_frequency = 10
-		max_num_steps = 200
+		max_num_steps = 30
 		baseline_steps = 10000
 		logistic_learning_rate = .01
 		threshold = .5
@@ -322,8 +322,8 @@ def main():
 			adjust_mahalanobis = False
 			epsilon_greedy = False
 			epsilon = 0
-			MLP = True
-			representation_layer_size = 10
+			MLP = False
+			representation_layer_size = None
 
 
 			run_and_plot(dataset, logging_frequency, max_num_steps, logistic_learning_rate, threshold, 

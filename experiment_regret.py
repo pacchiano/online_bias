@@ -54,6 +54,9 @@ def train_model_with_stopping(model, min_epoch_size, train_dataset, batch_size, 
   curr_epoch_size = min_epoch_size
   prev_loss_value = float("inf")
 
+  _, min_loss_value = compute_loss_confidence_band(6, model, min_epoch_size, train_dataset, batch_size, verbose = False, bottom_half = True)
+
+
   if restart_model_full_minimization:
     batch_X, batch_y = train_dataset.get_batch(batch_size)
     model.initialize_model(batch_X.shape[1])
@@ -69,13 +72,15 @@ def train_model_with_stopping(model, min_epoch_size, train_dataset, batch_size, 
       curr_loss = curr_loss.detach()
 
     if verbose:
-      print("Curr loss ", curr_loss, "Prev loss ", prev_loss_value, " epoch ", curr_epoch_index, " total num steps ", total_num_steps)
+      print("Curr loss ", curr_loss, "prev loss ", prev_loss_value, " epoch ", curr_epoch_index, " total num steps ", total_num_steps, " min loss value ", min_loss_value)
       
-    if curr_loss  < eps:#eps and prev_loss_value - eps < curr_loss:
+    if min_loss_value - eps < curr_loss and curr_loss < min_loss_value + eps:#eps and prev_loss_value - eps < curr_loss:
       #print("asdlfkmasdlfkmasdlkfmasldkfm", " Curr loss ", curr_loss, "Prev loss ", prev_loss_value)
       return model
-    
+
+    min_loss_value = min(curr_loss.detach(), min_loss_value)
     prev_loss_value = curr_loss.detach()
+
     total_num_steps += curr_epoch_size
 
     curr_epoch_size = 2*curr_epoch_size
@@ -83,8 +88,10 @@ def train_model_with_stopping(model, min_epoch_size, train_dataset, batch_size, 
     curr_epoch_index+= 1
     
     if curr_epoch_index%eps_epoch_cycle == 0:
-      eps *= 2
-
+      eps *= 5
+      max_epochs += 1
+      print("Minimization Expanded max epochs and expanded eps ")
+    
     if curr_epoch_index%max_epochs == 0:
       print("Curr epoch index ",curr_epoch_index, "total num steps", total_num_steps)
       curr_epoch_size = min_epoch_size
@@ -145,7 +152,9 @@ def train_model_counterfactual_with_stopping(model, loss_initial, loss_confidenc
       print("Counterfactual epoch ", curr_epoch_index)
 
       if curr_epoch_index%eps_epoch_cycle == 0:
-        loss_confidence_band*= 2
+        loss_confidence_band*= 5
+        max_epochs += 1
+        print("Counterfactual expanded max epochs and expanded the loss confidence band ")
 
       if curr_epoch_index%max_epochs == 0:
         counterfactual_reg = initial_counterfactual_reg
@@ -196,7 +205,7 @@ def compute_loss_confidence_band(num_loss_samples, model, num_steps, train_datas
       loss_values.sort()
       loss_values = loss_values[0:int(len(loss_values)/2)]  
 
-    return np.std(loss_values)
+    return np.std(loss_values), np.mean(loss_values)
 
 def gradient_step(model, optimizer, batch_X, batch_y):
 
