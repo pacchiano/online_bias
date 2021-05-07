@@ -88,9 +88,10 @@ def train_model_with_stopping(model, min_epoch_size, train_dataset, batch_size, 
     curr_epoch_index+= 1
     
     if curr_epoch_index%eps_epoch_cycle == 0:
-      eps *= 2
+      eps *= 5
       max_epochs += 1
-
+      print("Minimization Expanded max epochs and expanded eps ")
+    
     if curr_epoch_index%max_epochs == 0:
       print("Curr epoch index ",curr_epoch_index, "total num steps", total_num_steps)
       curr_epoch_size = min_epoch_size
@@ -151,8 +152,9 @@ def train_model_counterfactual_with_stopping(model, loss_initial, loss_confidenc
       print("Counterfactual epoch ", curr_epoch_index)
 
       if curr_epoch_index%eps_epoch_cycle == 0:
-        loss_confidence_band*= 2
+        loss_confidence_band*= 5
         max_epochs += 1
+        print("Counterfactual expanded max epochs and expanded the loss confidence band ")
 
       if curr_epoch_index%max_epochs == 0:
         counterfactual_reg = initial_counterfactual_reg
