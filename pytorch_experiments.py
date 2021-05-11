@@ -778,4 +778,5 @@ def main():
             raise ValueError("Asdlfkm")
 
 
-main()
+if __name__ == "__main__":
+    main()
