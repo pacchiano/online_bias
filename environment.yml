@@ -3,13 +3,14 @@ channels:
   - javascript
 dependencies:
   - pytorch=1.7
-  - python=3.7  
+  - python=3.7
   - matplotlib
   - pandas
   - scipy
   - sklearn
   - torchvision
   - IPython
+  - submitit
   - pip:
     - ray
     - sklearn

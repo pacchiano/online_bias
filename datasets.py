@@ -2,27 +2,25 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import matplotlib
 import matplotlib.pyplot as plt
-
 import numpy as np
-import matplotlib.pyplot as plt
-
-import scipy.stats
-
-import requests
 import pandas as pd
-import tempfile
-import matplotlib.pyplot as plt
 import torch
 from torchvision import datasets, transforms
-
-# from sklearn.model_selection import train_test_split
-# from sklearn import metrics
-import numpy.random as npr
-from scipy.stats import wasserstein_distance, ks_2samp
-from sklearn.linear_model import LogisticRegression
-from datasets_fairness import *
+from datasets_fairness import (
+    AdultParams,
+    BankParams,
+    CrimeParams,
+    GermanParams,
+    collect_adult_protected_xy,
+    collect_bank_protected_xy,
+    collect_crime_protected_xy,
+    collect_german_protected_xy,
+    read_and_preprocess_adult_data_uai,
+    read_and_preprocess_german_data,
+    read_and_preprocess_bank_data,
+    read_and_preprocess_crime_data,
+)
 
 
 # @title Data utilities
@@ -268,8 +266,8 @@ class SVMDataset:
                     color=colors[i],
                     label="{} {}".format(self.class_list_per_center[i], names[i]),
                 )
-            if model != None:
-                ## Plot line
+            if model is not None:
+                # Plot line
                 model.plot(min_x, max_x)
             plt.grid(True)
             plt.legend(loc="lower right")
@@ -342,12 +340,7 @@ def get_dataset(dataset, batch_size, test_batch_size):
         # dataframe_all_train = dataframe_all_train.sample(data_size, random_state=random_state)
 
         # Identify portions of the data corresponding to particuar values of specific protected attributes.
-        dataframes_protected_train = collect_adult_protected_dataframes(
-            dataframe_all_train, PROTECTED_GROUPS
-        )
-        dataframes_protected_test = collect_adult_protected_dataframes(
-            dataframe_all_test, PROTECTED_GROUPS
-        )
+        # REMOVED
 
         # Split all data into features and labels.
         x_all_train = dataframe_all_train[feature_names]
@@ -355,21 +348,8 @@ def get_dataset(dataset, batch_size, test_batch_size):
         x_all_test = dataframe_all_test[feature_names]
         y_all_test = dataframe_all_test[AdultParams.LABEL_COLUMN]
 
-        x_protected_train = [df[feature_names] for df in dataframes_protected_train]
-        y_protected_train = [
-            df[AdultParams.LABEL_COLUMN] for df in dataframes_protected_train
-        ]
-        x_protected_test = [df[feature_names] for df in dataframes_protected_test]
-        y_protected_test = [
-            df[AdultParams.LABEL_COLUMN] for df in dataframes_protected_test
-        ]
-
         train_dataset = DataSet(x_all_train, y_all_train)
         test_dataset = DataSet(x_all_test, y_all_test)
-
-        import IPython
-
-        IPython.embed()
 
         xy_protected_train = collect_adult_protected_xy(
             x_all_train, y_all_train, PROTECTED_GROUPS
@@ -394,7 +374,7 @@ def get_dataset(dataset, batch_size, test_batch_size):
     elif dataset == "German":
         PROTECTED_GROUPS = GermanParams.PROTECTED_THRESHOLDS
 
-        ### LOAD ALL THE DATA ###
+        # LOAD ALL THE DATA
         (
             dataframe_all_train,
             dataframe_all_test,
@@ -404,27 +384,13 @@ def get_dataset(dataset, batch_size, test_batch_size):
 
         # Identify portions of the data corresponding to particuar values of specific
         # protected attributes.
-        dataframes_protected_train = collect_german_protected_dataframes(
-            dataframe_all_train
-        )
-        dataframes_protected_test = collect_german_protected_dataframes(
-            dataframe_all_test
-        )
+        # REMOVED
 
         # Split all data into features and labels.
         x_all_train = dataframe_all_train[feature_names]
         y_all_train = dataframe_all_train[GermanParams.LABEL_COLUMN]
         x_all_test = dataframe_all_test[feature_names]
         y_all_test = dataframe_all_test[GermanParams.LABEL_COLUMN]
-
-        x_protected_train = [df[feature_names] for df in dataframes_protected_train]
-        y_protected_train = [
-            df[GermanParams.LABEL_COLUMN] for df in dataframes_protected_train
-        ]
-        x_protected_test = [df[feature_names] for df in dataframes_protected_test]
-        y_protected_test = [
-            df[GermanParams.LABEL_COLUMN] for df in dataframes_protected_test
-        ]
 
         # In utilities_final.py: Dataset class to be able to sample batches
         train_dataset = DataSet(x_all_train, y_all_train)
@@ -448,7 +414,7 @@ def get_dataset(dataset, batch_size, test_batch_size):
 
         PROTECTED_GROUPS = BankParams.PROTECTED_GROUPS
 
-        ### LOAD ALL THE DATA ###
+        # LOAD ALL THE DATA
         (
             dataframe_all_train,
             dataframe_all_test,
@@ -458,27 +424,13 @@ def get_dataset(dataset, batch_size, test_batch_size):
 
         # Identify portions of the data corresponding to particuar values of specific
         # protected attributes.
-        dataframes_protected_train = collect_bank_protected_dataframes(
-            dataframe_all_train, PROTECTED_GROUPS
-        )
-        dataframes_protected_test = collect_bank_protected_dataframes(
-            dataframe_all_test, PROTECTED_GROUPS
-        )
+        # REMOVED
 
         # Split all data into features and regression targets.
         x_all_train = dataframe_all_train[feature_names]
         y_all_train = dataframe_all_train[BankParams.LABEL_COLUMN]
         x_all_test = dataframe_all_test[feature_names]
         y_all_test = dataframe_all_test[BankParams.LABEL_COLUMN]
-
-        x_protected_train = [df[feature_names] for df in dataframes_protected_train]
-        y_protected_train = [
-            df[BankParams.LABEL_COLUMN] for df in dataframes_protected_train
-        ]
-        x_protected_test = [df[feature_names] for df in dataframes_protected_test]
-        y_protected_test = [
-            df[BankParams.LABEL_COLUMN] for df in dataframes_protected_test
-        ]
 
         # In utilities_final.py: Dataset class to be able to sample batches
         train_dataset = DataSet(x_all_train, y_all_train)
@@ -502,7 +454,7 @@ def get_dataset(dataset, batch_size, test_batch_size):
 
         PROTECTED_GROUPS = CrimeParams.PROTECTED_GROUPS
 
-        ### LOAD ALL THE DATA ###
+        # LOAD ALL THE DATA
         (
             dataframe_all_train,
             dataframe_all_test,
@@ -510,28 +462,11 @@ def get_dataset(dataset, batch_size, test_batch_size):
         ) = read_and_preprocess_crime_data()
         # dataframe_all_train = dataframe_all_train.sample(data_size, random_state=random_state)
 
-        # Identify portions of the data corresponding to particuar values of specific protected attributes.
-        dataframes_protected_train = collect_crime_protected_dataframes(
-            dataframe_all_train, PROTECTED_GROUPS
-        )
-        dataframes_protected_test = collect_crime_protected_dataframes(
-            dataframe_all_test, PROTECTED_GROUPS
-        )
-
         # Split all data into features and labels.
         x_all_train = dataframe_all_train[feature_names]
         y_all_train = dataframe_all_train[CrimeParams.LABEL_COLUMN]
         x_all_test = dataframe_all_test[feature_names]
         y_all_test = dataframe_all_test[CrimeParams.LABEL_COLUMN]
-
-        x_protected_train = [df[feature_names] for df in dataframes_protected_train]
-        y_protected_train = [
-            df[CrimeParams.LABEL_COLUMN] for df in dataframes_protected_train
-        ]
-        x_protected_test = [df[feature_names] for df in dataframes_protected_test]
-        y_protected_test = [
-            df[CrimeParams.LABEL_COLUMN] for df in dataframes_protected_test
-        ]
 
         # In utilities_final.py: Dataset class to be able to sample batches
         train_dataset = DataSet(x_all_train, y_all_train)
