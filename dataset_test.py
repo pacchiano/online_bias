@@ -3,8 +3,6 @@ import matplotlib.pyplot as plt
 import IPython
 
 
-
-
 # protected_datasets_train, protected_datasets_test, train_dataset, test_dataset = get_dataset("MultiSVM")
 
 # batch_size = 100
@@ -13,8 +11,9 @@ import IPython
 # plt.savefig("./experiment_results/dataset_test.png")
 
 
-
-
-
-
-protected_datasets_train, protected_datasets_test, train_dataset, test_dataset = get_dataset("Adult", 30, 10)
+(
+    protected_datasets_train,
+    protected_datasets_test,
+    train_dataset,
+    test_dataset,
+) = get_dataset("Adult", 30, 10)
