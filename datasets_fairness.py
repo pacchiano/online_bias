@@ -17,8 +17,8 @@ from sklearn import model_selection
 class AdultParams_nonuai(object):
     """A namespace for adult dataset constant parameters."""
 
-    PATH_TRAIN = "./adult.data"  #'https://archive.ics.uci.edu/ml/machine-learning-databases/adult/adult.data'
-    PATH_TEST = "./adult.test"  #'https://archive.ics.uci.edu/ml/machine-learning-databases/adult/adult.test'
+    PATH_TRAIN = "./datasets/adult.data"  #'https://archive.ics.uci.edu/ml/machine-learning-databases/adult/adult.data'
+    PATH_TEST = "./datasets/adult.test"  #'https://archive.ics.uci.edu/ml/machine-learning-databases/adult/adult.test'
 
     CATEGORICAL_COLUMNS = [
         "workclass",
@@ -523,7 +523,7 @@ def collect_adult_protected_xy(
 class BankParams(object):
     """A namespace for "Bank" dataset constant parameters."""
 
-    PATH = "./bank-additional-full.csv"
+    PATH = "./datasets/bank-additional-full.csv"
 
     CATEGORICAL_COLUMNS = (
         "job",
@@ -724,11 +724,11 @@ def collect_bank_protected_xy(
 class CrimeParams(object):
     """A namespace for "Crime" dataset constant parameters."""
 
-    PATH_TRAIN = "./crime_train.csv"
+    PATH_TRAIN = "./datasets/crime_train.csv"
 
-    PATH_VALIDATION = "./crime_val.csv"
+    PATH_VALIDATION = "./datasets/crime_val.csv"
 
-    PATH_TEST = "./crime_test.csv"
+    PATH_TEST = "./datasets/crime_test.csv"
 
     LABEL_COLUMN = "label"
 
@@ -902,7 +902,7 @@ def collect_crime_protected_xy(
 class LsacParams(object):
     """A namespace for "LSAC" dataset constant parameters."""
 
-    PATH = "./lsac.csv"
+    PATH = "./datasets/lsac.csv"
 
     REGRESSION_TARGET_COLUMN = "zgpa"
 
@@ -1103,7 +1103,7 @@ def collect_lsac_protected_xy(
 class GermanParams(object):
     """A namespace for "German" dataset constant parameters."""
 
-    PATH = "./statlog_german_credit.pkl"
+    PATH = "./datasets/statlog_german_credit.pkl"
 
     LABEL_COLUMN = "label"
 
