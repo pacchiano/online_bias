@@ -8,7 +8,10 @@ import shutil
 import submitit
 
 from pytorch_experiments import (
-    run_and_plot, ExplorationHparams, LinearModelHparams, NNParams
+    run_and_plot,
+    ExplorationHparams,
+    LinearModelHparams,
+    NNParams,
 )
 
 

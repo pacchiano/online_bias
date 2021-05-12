@@ -1,10 +1,10 @@
-import matplotlib
 import numpy as np
 import matplotlib.pyplot as plt
+
 # import ray
 import os
-import pickle
-import itertools
+
+# import pickle
 
 from dataclasses import dataclass
 from experiment_regret import run_regret_experiment_pytorch
@@ -16,6 +16,12 @@ from typing import Any
 USE_RAY = False
 # TODO: fix w submitit
 # ray.init(ignore_reinit_error=True)
+
+LINEWIDTH = 3.5
+LINESTYLE = "dashed"
+STD_GAP = 0.5
+ALPHA = 0.1
+FAST = True
 
 
 @dataclass
@@ -209,8 +215,8 @@ def analyze_experiments(
     nn_params,
     linear_model_hparams,
     exploration_hparams,
-    logging_frequency=100,
-    num_experiments=5,
+    logging_frequency,
+    num_experiments,
 ):
     test_biased_accuracies_cum_averages_summary = np.zeros(
         (num_experiments, int(nn_params.max_num_steps / logging_frequency))
@@ -308,113 +314,77 @@ def analyze_experiments(
     )
 
 
-def plot_results(timesteps, experiment_results, network_type, base_figs_directory):
+def plot_accuracy(timesteps, accuracies, accuracies_stds, label, color):
     plt.plot(
         timesteps,
-        experiment_results.mean_test_biased_accuracies_cum_averages,
-        label="Biased Model Test - no decision adjustment",
-        linestyle="dashed",
-        linewidth=3.5,
-        color="blue",
+        accuracies,
+        label=label,
+        linestyle=LINESTYLE,
+        linewidth=LINEWIDTH,
+        color=color,
     )
+    print(len(accuracies))
+    print(accuracies_stds)
+    print(accuracies)
+    # if len(accuracies)
+    gap = len(timesteps) * [STD_GAP]
     plt.fill_between(
         timesteps,
-        experiment_results.mean_test_biased_accuracies_cum_averages
-        - 0.5 * experiment_results.std_test_biased_accuracies_cum_averages,
-        experiment_results.mean_test_biased_accuracies_cum_averages
-        + 0.5 * experiment_results.std_test_biased_accuracies_cum_averages,
-        color="blue",
-        alpha=0.1,
+        # accuracies - STD_GAP * accuracies_stds,
+        # accuracies + STD_GAP * accuracies_stds,
+        accuracies - gap * accuracies_stds,
+        accuracies + gap * accuracies_stds,
+        color=color,
+        alpha=ALPHA,
     )
 
-    plt.plot(
-        timesteps,
-        experiment_results.mean_accuracies_cum_averages,
-        label="Unbiased Model Test - all data train",
-        linestyle="dashed",
-        linewidth=3.5,
-        color="red",
-    )
-    plt.fill_between(
-        timesteps,
-        experiment_results.mean_accuracies_cum_averages
-        - 0.5 * experiment_results.std_accuracies_cum_averages,
-        experiment_results.mean_accuracies_cum_averages
-        + 0.5 * experiment_results.std_accuracies_cum_averages,
-        color="red",
-        alpha=0.1,
-    )
 
-    plt.plot(
-        timesteps,
-        experiment_results.mean_train_biased_accuracies_cum_averages,
-        label="Online Biased Model - filtered data train",
-        linestyle="dashed",
-        linewidth=3.5,
-        color="violet",
-    )
-    plt.fill_between(
-        timesteps,
-        experiment_results.mean_train_biased_accuracies_cum_averages
-        + 0.5 * experiment_results.std_train_biased_accuracies_cum_averages,
-        experiment_results.mean_train_biased_accuracies_cum_averages
-        - 0.5 * experiment_results.std_train_biased_accuracies_cum_averages,
-        color="violet",
-        alpha=0.1,
-    )
-
-    plt.plot(
-        timesteps,
-        [experiment_results.baseline_results.mean_accuracy_validation_baseline_summary]
-        * len(timesteps),
-        label="Baseline Accuracy",
-        linestyle="dashed",
-        linewidth=3.5,
-        color="black",
-    )
-    plt.fill_between(
-        timesteps,
-        [
-            experiment_results.baseline_results.mean_accuracy_validation_baseline_summary
-            - 0.5
-            * experiment_results.baseline_results.std_accuracy_validation_baseline_summary
-        ]
-        * len(timesteps),
-        [
-            experiment_results.baseline_results.mean_accuracy_validation_baseline_summary
-            + 0.5
-            * experiment_results.baseline_results.std_accuracy_validation_baseline_summary
-        ]
-        * len(timesteps),
-        color="black",
-        alpha=0.1,
-    )
+def plot_title(
+    plot_type,
+    dataset,
+    network_type,
+    training_mode,
+    exploration_hparams,
+):
+    if plot_type == "accuracy":
+        plot_type_prefix = "Test and Train Accuracies"
+        plot_type_file_prefix = "test_train_accuracies"
+    elif plot_type == "regret":
+        plot_type_prefix = "Regret"
+        plot_type_file_prefix = "regret"
+    elif plot_type == "loss":
+        plot_type_prefix = "Loss"
+        plot_type_file_prefix = "loss"
 
     if exploration_hparams.decision_type == "simple":
         if exploration_hparams.epsilon_greedy:
             plt.title(
-                "Test and Train Accuracies {} - Epsilon Greedy {} - {} - {}".format(
-                    dataset, exploration_hparams.epsilon, network_type, training_mode
+                (
+                    f"{plot_type_prefix} {dataset} - "
+                    f"Epsilon Greedy {exploration_hparams.epsilon} - {network_type} - {training_mode}"
                 ),
                 fontsize=8,
             )
-            plot_name = "{}_test_train_accuracies_epsgreedy_{}_{}_{}".format(
-                dataset, exploration_hparams.epsilon, network_type, training_mode
+            plot_name = "{}_{}_epsgreedy_{}_{}_{}".format(
+                dataset,
+                plot_type_file_prefix,
+                exploration_hparams.epsilon,
+                network_type,
+                training_mode,
             )
         if exploration_hparams.adjust_mahalanobis:
             plt.title(
-                "Test and Train Accuracies {} - Optimism alpha {} - Mreg {} - Mdisc {} - {} - {}".format(
-                    dataset,
-                    exploration_hparams.alpha,
-                    exploration_hparams.mahalanobis_regularizer,
-                    exploration_hparams.mahalanobis_discount_factor,
-                    network_type,
-                    training_mode,
+                (
+                    f"{plot_type_prefix} {dataset} - Optimism alpha {exploration_hparams.alpha} "
+                    f"- Mreg {exploration_hparams.mahalanobis_regularizer} "
+                    f"- Mdisc {exploration_hparams.mahalanobis_discount_factor} - "
+                    f"{network_type} - {training_mode}"
                 ),
                 fontsize=8,
             )
-            plot_name = "{}_test_train_accuracies_optimism_alpha_{}_mahreg_{}_mdisc_{}_{}_{}".format(
+            plot_name = "{}_{}_optimism_alpha_{}_mahreg_{}_mdisc_{}_{}_{}".format(
                 dataset,
+                plot_type_file_prefix,
                 exploration_hparams.alpha,
                 exploration_hparams.mahalanobis_regularizer,
                 exploration_hparams.mahalanobis_discount_factor,
@@ -426,37 +396,93 @@ def plot_results(timesteps, experiment_results, network_type, base_figs_director
             and not exploration_hparams.adjust_mahalanobis
         ):
             plt.title(
-                "Test and Train Accuracies {} - {} - {} ".format(
-                    dataset, network_type, training_mode
+                "{} {} - {} - {} ".format(
+                    plot_type_prefix, dataset, network_type, training_mode
                 ),
                 fontsize=8,
             )
-            plot_name = "{}_test_train_accuracies_biased_{}_{}".format(
-                dataset, network_type, training_mode
+            plot_name = "{}_{}_biased_{}_{}".format(
+                dataset, plot_type_file_prefix, network_type, training_mode
             )
     elif exploration_hparams.decision_type == "counterfactual":
         plt.title(
-            "Test and Train Accuracies {} - {} - {} - {}".format(
-                dataset, network_type, training_mode, exploration_hparams.decision_type
+            "{} {} - {} - {} - {}".format(
+                plot_type_prefix,
+                dataset,
+                network_type,
+                training_mode,
+                exploration_hparams.decision_type,
             ),
             fontsize=8,
         )
-        plot_name = "{}_test_train_accuracies_biased_{}_{}_{}".format(
-            dataset, network_type, training_mode, exploration_hparams.decision_type
+        plot_name = "{}_{}_biased_{}_{}_{}".format(
+            dataset,
+            plot_type_file_prefix,
+            network_type,
+            training_mode,
+            exploration_hparams.decision_type,
         )
 
     else:
         raise ValueError(
             "Decision type not recognized {}".format(exploration_hparams.decision_type)
         )
+    return plot_name
 
+
+def plot_results(
+    timesteps,
+    experiment_results,
+    network_type,
+    base_figs_directory,
+    dataset,
+    training_mode,
+    exploration_hparams,
+):
+    # colors = ["blue", "red", "violet", "black"]
+    # ACCURACY PLOTS
+    plot_accuracy(
+        timesteps,
+        experiment_results.mean_test_biased_accuracies_cum_averages,
+        experiment_results.std_test_biased_accuracies_cum_averages,
+        "Biased Model Test - no decision adjustment",
+        "blue",
+    )
+    plot_accuracy(
+        timesteps,
+        experiment_results.mean_accuracies_cum_averages,
+        experiment_results.std_accuracies_cum_averages,
+        label="Unbiased Model Test - all data train",
+        color="red",
+    )
+    plot_accuracy(
+        timesteps,
+        experiment_results.mean_train_biased_accuracies_cum_averages,
+        experiment_results.std_train_biased_accuracies_cum_averages,
+        label="Online Biased Model - filtered data train",
+        color="violet",
+    )
+    plot_accuracy(
+        timesteps,
+        [experiment_results.mean_train_biased_accuracies_cum_averages] * len(timesteps),
+        [experiment_results.std_train_biased_accuracies_cum_averages] * len(timesteps),
+        label="Baseline Accuracy",
+        color="black",
+    )
+
+    plot_name = plot_title(
+        "accuracy",
+        dataset,
+        network_type,
+        training_mode,
+        experiment_results,
+        exploration_hparams,
+    )
     plt.xlabel("Timesteps")
     plt.ylabel("Accuracy")
     # plt.legend(loc = "lower right")
-
     lg = plt.legend(bbox_to_anchor=(1.05, 1), fontsize=8, loc="upper left")
     # plt.tight_layout()
-
     plt.savefig(
         "{}/{}.png".format(base_figs_directory, plot_name),
         bbox_extra_artists=(lg,),
@@ -464,213 +490,65 @@ def plot_results(timesteps, experiment_results, network_type, base_figs_director
     )
     plt.close("all")
 
-    plt.plot(
+    # REGRET PLOTS
+    plot_accuracy(
         timesteps,
         experiment_results.mean_train_cum_regret_averages,
+        experiment_results.std_train_cum_regret_averages,
         label="Regret",
-        linestyle="dashed",
-        linewidth=3.5,
         color="blue",
     )
-    plt.fill_between(
-        timesteps,
-        experiment_results.mean_train_cum_regret_averages
-        - 0.5 * experiment_results.std_train_cum_regret_averages,
-        experiment_results.mean_train_cum_regret_averages
-        + 0.5 * experiment_results.std_train_cum_regret_averages,
-        color="blue",
-        alpha=0.1,
+    plot_name = plot_title(
+        "regret",
+        dataset,
+        network_type,
+        training_mode,
+        experiment_results,
+        exploration_hparams,
     )
-
-    if exploration_hparams.decision_type == "simple":
-        if exploration_hparams.epsilon_greedy:
-            plt.title(
-                "Regret {} - Epsilon Greedy {} - {} - {}".format(
-                    dataset, exploration_hparams.epsilon, network_type, training_mode
-                ),
-                fontsize=8,
-            )
-            plot_name = "{}_regret_epsgreedy_{}_{}_{}".format(
-                dataset, exploration_hparams.epsilon, network_type, training_mode
-            )
-        if exploration_hparams.adjust_mahalanobis:
-            plt.title(
-                "Regret {} - Optimism alpha {} - Mreg {} - Mdisc {} - {} - {}".format(
-                    dataset,
-                    exploration_hparams.alpha,
-                    exploration_hparams.mahalanobis_regularizer,
-                    exploration_hparams.mahalanobis_discount_factor,
-                    network_type,
-                    training_mode,
-                ),
-                fontsize=8,
-            )
-            plot_name = "{}_regret_optimism_alpha_{}_mahreg_{}_mdisc_{}_{}_{}".format(
-                dataset,
-                exploration_hparams.alpha,
-                exploration_hparams.mahalanobis_regularizer,
-                exploration_hparams.mahalanobis_discount_factor,
-                network_type,
-                training_mode,
-            )
-        if (
-            not exploration_hparams.epsilon_greedy
-            and not exploration_hparams.adjust_mahalanobis
-        ):
-            plt.title(
-                "Regret {} - {} - {}".format(dataset, network_type, training_mode),
-                fontsize=8,
-            )
-            plot_name = "{}_regret_biased_{}_{}".format(
-                dataset, network_type, training_mode
-            )
-    elif exploration_hparams.decision_type == "counterfactual":
-        plt.title(
-            "Regret {} - {} - {} - {}".format(
-                dataset, network_type, training_mode, exploration_hparams.decision_type
-            ),
-            fontsize=8,
-        )
-        plot_name = "{}_regret_biased_{}_{}_{}".format(
-            dataset, network_type, training_mode, exploration_hparams.decision_type
-        )
-    else:
-        raise ValueError(
-            "Decision type not recognized {}".format(exploration_hparams.decision_type)
-        )
-
     plt.xlabel("Timesteps")
     plt.ylabel("Regret")
-    # plt.legend(loc = "lower right")
     lg = plt.legend(bbox_to_anchor=(1.05, 1), fontsize=8, loc="upper left")
-    # plt.tight_layout()
-
     plt.savefig(
         "{}/{}.png".format(base_figs_directory, plot_name),
         bbox_extra_artists=(lg,),
         bbox_inches="tight",
     )
-
     plt.close("all")
+
     # LOSS PLOTS
-    plt.plot(
+    plot_accuracy(
         timesteps,
         experiment_results.validation_results.mean_loss_validation_averages,
+        experiment_results.validation_results.std_loss_validation_averages,
         label="Unbiased model loss",
-        linestyle="dashed",
-        linewidth=3.5,
         color="blue",
     )
-    plt.fill_between(
-        timesteps,
-        experiment_results.validation_results.mean_loss_validation_averages
-        - 0.5 * experiment_results.validation_results.std_loss_validation_averages,
-        experiment_results.validation_results.mean_loss_validation_averages
-        + 0.5 * experiment_results.validation_results.std_loss_validation_averages,
-        color="blue",
-        alpha=0.1,
-    )
-
-    plt.plot(
+    plot_accuracy(
         timesteps,
         experiment_results.validation_results.mean_loss_validation_biased_averages,
+        experiment_results.validation_results.std_loss_validation_biased_averages,
         label="Biased model loss",
-        linestyle="dashed",
-        linewidth=3.5,
         color="red",
     )
-    plt.fill_between(
+    plot_accuracy(
         timesteps,
-        experiment_results.validation_results.mean_loss_validation_biased_averages
-        - 0.5
-        * experiment_results.validation_results.std_loss_validation_biased_averages,
-        experiment_results.validation_results.mean_loss_validation_biased_averages
-        + 0.5
-        * experiment_results.validation_results.std_loss_validation_biased_averages,
-        color="red",
-        alpha=0.1,
-    )
-
-    plt.plot(
-        timesteps,
-        [mean_loss_validation_baseline_summary] * len(timesteps),
+        [experiment_results.mean_loss_validation_baseline_summary] * len(timesteps),
+        [experiment_results.std_loss_validation_baseline_summary] * len(timesteps),
         label="Baseline Loss",
-        linestyle="dashed",
-        linewidth=3.5,
         color="black",
     )
-    plt.fill_between(
-        timesteps,
-        [
-            mean_loss_validation_baseline_summary
-            - 0.5 * std_loss_validation_baseline_summary
-        ]
-        * len(timesteps),
-        [
-            mean_loss_validation_baseline_summary
-            + 0.5 * std_loss_validation_baseline_summary
-        ]
-        * len(timesteps),
-        color="black",
-        alpha=0.1,
+    plot_name = plot_title(
+        "loss",
+        dataset,
+        network_type,
+        training_mode,
+        experiment_results,
+        exploration_hparams,
     )
-
-    if decision_type == "simple":
-        if epsilon_greedy:
-            plt.title(
-                "Loss {} - Epsilon Greedy {} - {} - {}".format(
-                    dataset, epsilon, network_type, training_mode
-                ),
-                fontsize=8,
-            )
-            plot_name = "{}_loss_epsgreedy_{}_{}_{}".format(
-                dataset, epsilon, network_type, training_mode
-            )
-        if adjust_mahalanobis:
-            plt.title(
-                "Loss {} - Optimism alpha {} - Mreg {} - Mdisc {} - {} - {}".format(
-                    dataset,
-                    alpha,
-                    mahalanobis_regularizer,
-                    mahalanobis_discount_factor,
-                    network_type,
-                    training_mode,
-                ),
-                fontsize=8,
-            )
-            plot_name = "{}_loss_optimism_alpha_{}_mahreg_{}_mdisc_{}_{}_{}".format(
-                dataset,
-                alpha,
-                mahalanobis_regularizer,
-                mahalanobis_discount_factor,
-                network_type,
-                training_mode,
-            )
-        if not epsilon_greedy and not adjust_mahalanobis:
-            plt.title(
-                "Loss {} - {} - {}".format(dataset, network_type, training_mode),
-                fontsize=8,
-            )
-            plot_name = "{}_loss_biased_{}_{}".format(
-                dataset, network_type, training_mode
-            )
-    elif decision_type == "counterfactual":
-        plt.title(
-            "Loss {} - {} - {} - {}".format(
-                dataset, network_type, training_mode, decision_type
-            ),
-            fontsize=8,
-        )
-        plot_name = "{}_loss_biased_{}_{}_{}".format(
-            dataset, network_type, training_mode, decision_type
-        )
-
     plt.xlabel("Timesteps")
     plt.ylabel("Loss")
-    # plt.legend(loc = "lower right")good
-
     lg = plt.legend(bbox_to_anchor=(1.05, 1), fontsize=8, loc="upper left")
-    # plt.tight_layout()
 
     plt.savefig(
         "{}/{}.png".format(base_figs_directory, plot_name),
@@ -711,151 +589,65 @@ def run_and_plot(
         logging_frequency=100,
         num_experiments=5,
     )
-    experiment_results = analyze_experiments(experiment_summaries)
-    timesteps = experiment_summaries[0][0]
-    plot_results(timesteps, experiment_results, network_type, base_figs_directory)
-    pickle.dump(
-        (
-            timesteps,
-            mean_test_biased_accuracies_cum_averages,
-            std_test_biased_accuracies_cum_averages,
-            mean_accuracies_cum_averages,
-            std_accuracies_cum_averages,
-            mean_train_biased_accuracies_cum_averages,
-            std_train_biased_accuracies_cum_averages,
-            max_num_steps,
-            mean_loss_validation_averages,
-            std_loss_validation_averages,
-            mean_loss_validation_biased_averages,
-            std_loss_validation_biased_averages,
-        ),
-        open("{}/{}.p".format(base_data_directory, plot_name), "wb"),
+    experiment_results = analyze_experiments(
+        experiment_summaries,
+        dataset,
+        training_mode,
+        nn_params,
+        linear_model_hparams,
+        exploration_hparams,
+        logging_frequency=logging_frequency,
+        num_experiments=num_experiments,
     )
+    timesteps = experiment_summaries[0][0]
+    plot_results(
+        timesteps,
+        experiment_results,
+        network_type,
+        base_figs_directory,
+        dataset,
+        training_mode,
+        exploration_hparams,
+    )
+    # pickle.dump(
+    #     (
+    #         timesteps,
+    #         mean_test_biased_accuracies_cum_averages,
+    #         std_test_biased_accuracies_cum_averages,
+    #         mean_accuracies_cum_averages,
+    #         std_accuracies_cum_averages,
+    #         mean_train_biased_accuracies_cum_averages,
+    #         std_train_biased_accuracies_cum_averages,
+    #         max_num_steps,
+    #         mean_loss_validation_averages,
+    #         std_loss_validation_averages,
+    #         mean_loss_validation_biased_averages,
+    #         std_loss_validation_biased_averages,
+    #     ),
+    #     open("{}/{}.p".format(base_data_directory, plot_name), "wb"),
+    # )
 
 
-# if __name__ == "__main__":
-#     dataset = "MultiSVM"
-#     training_mode = "full_minimization"
-#     nn_params = NNParams()
-#     linear_model_hparams = LinearModelHparams()
-#     exploration_hparams = ExplorationHparams()
-#     num_experiments = 5
-#     logging_frequency = 1000
-#     run_and_plot(
-#         dataset,
-#         training_mode,
-#         nn_params,
-#         linear_model_hparams,
-#         exploration_hparams,
-#         logging_frequency,
-#         num_experiments,
-#     )
+if __name__ == "__main__":
+    dataset = "MultiSVM"
+    training_mode = "full_minimization"
+    nn_params = NNParams()
+    linear_model_hparams = LinearModelHparams()
+    exploration_hparams = ExplorationHparams()
+    if FAST:
+        nn_params.max_num_steps = 2
+        nn_params.baseline_steps = 10
+        training_mode = "gradient_step"
+        exploration_hparams.decision_type = "simple"
 
-
-# TODO: deprecated.
-# def main():
-#
-#     for dataset in [
-#         "MultiSVM",
-#         "Adult",
-#         "MNIST",
-#     ]:
-#         training_modes = [
-#             "full_minimization",
-#             "gradient_step",
-#         ]  # , "full_minimization"]
-#
-#         logging_frequency = 10
-#         max_num_steps = 30
-#         baseline_steps = 10000
-#         logistic_learning_rate = 0.01
-#         threshold = 0.5
-#         biased_threshold = 0.5
-#         batch_size = 10
-#         random_init = True
-#         fit_intercept = True
-#
-#         num_experiments = 5
-#
-#         representation_layer_sizes = [10, 40, 100]
-#         mahalanobis_discount_factors = [1, 0.9, 0.8]
-#         mahalanobis_reguarizers = [0.1]
-#         epsilons = [0.1, 0.2, 0.5]
-#         alphas = [1, 4]
-#
-#         MLP_and_layer_sizes = [(False, None)] + list(
-#             itertools.product([True], representation_layer_sizes)
-#         )
-#         trainmodes_decision_type_adjmahalanobis_epsgreedy_epsilon_mahdisc_mahreg_alpha = list(
-#             itertools.product(
-#                 training_modes, ["simple"], [False], [True], epsilons, [0], [0], [0]
-#             )
-#         ) + list(
-#             itertools.product(
-#                 training_modes,
-#                 ["simple"],
-#                 [True],
-#                 [False],
-#                 [0],
-#                 mahalanobis_discount_factors,
-#                 mahalanobis_reguarizers,
-#                 alphas,
-#             )
-#         )
-#         trainmodes_decision_type_adjmahalanobis_epsgreedy_epsilon_mahdisc_mahreg_alpha += [
-#             ("full_minimization", "counterfactual", False, False, 0, 0, 0, 0)
-#         ]
-#
-#         all_params = list(
-#             itertools.product(
-#                 MLP_and_layer_sizes,
-#                 trainmodes_decision_type_adjmahalanobis_epsgreedy_epsilon_mahdisc_mahreg_alpha,
-#             )
-#         )
-#         all_params = [tuple(list(x[0]) + list(x[1])) for x in all_params]
-#
-#         for (
-#             MLP,
-#             representation_layer_size,
-#             training_mode,
-#             decision_type,
-#             adjust_mahalanobis,
-#             epsilon_greedy,
-#             epsilon,
-#             mahalanobis_discount_factor,
-#             mahalanobis_regularizer,
-#             alpha,
-#         ) in all_params:
-#             training_mode = "full_minimization"
-#             decision_type = "counterfactual"
-#             adjust_mahalanobis = False
-#             epsilon_greedy = False
-#             epsilon = 0
-#             MLP = False
-#             representation_layer_size = None
-#
-#             run_and_plot(
-#                 dataset,
-#                 logging_frequency,
-#                 max_num_steps,
-#                 logistic_learning_rate,
-#                 threshold,
-#                 biased_threshold,
-#                 batch_size,
-#                 random_init,
-#                 fit_intercept,
-#                 num_experiments,
-#                 mahalanobis_regularizer,
-#                 adjust_mahalanobis,
-#                 epsilon_greedy,
-#                 epsilon,
-#                 alpha,
-#                 MLP,
-#                 representation_layer_size,
-#                 baseline_steps,
-#                 mahalanobis_discount_factor,
-#                 training_mode,
-#                 decision_type,
-#             )
-#
-#             raise ValueError("Asdlfkm")
+    num_experiments = 5
+    logging_frequency = 10
+    run_and_plot(
+        dataset,
+        training_mode,
+        nn_params,
+        linear_model_hparams,
+        exploration_hparams,
+        logging_frequency,
+        num_experiments,
+    )

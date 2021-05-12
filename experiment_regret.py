@@ -366,24 +366,14 @@ def run_regret_experiment_pytorch(
         representation_layer_size=nn_params.representation_layer_size,
     )
 
-    if (
-        exploration_hparams.decision_type == "counterfactual"
-        and exploration_hparams.epsilon_greedy
-    ):
-        raise ValueError(
-            "Decision type set to counterfactual and epsilon greedy set to True"
-        )
-    if (
-        exploration_hparams.decision_type == "counterfactual"
-        and exploration_hparams.adjust_mahalanobis
-    ):
-        raise ValueError(
-            "Decision type set to counterfactual and adjust_mahalanobis set to True"
-        )
-
+    if exploration_hparams.decision_type == "counterfactual":
+        if exploration_hparams.epsilon_greedy or exploration_hparams.adjust_mahalanobis:
+            raise ValueError(
+                "Decision type set to counterfactual, can't set exploration constants."
+            )
+    # TODO
     if dataset == "MNIST":
         baseline_batch_size = nn_params.batch_size
-    # TODO
     else:
         baseline_batch_size = 10
 
@@ -408,19 +398,10 @@ def run_regret_experiment_pytorch(
 
     print("Baseline model accuracy {}".format(baseline_accuracy))
 
-    # num_protected_groups = len(protected_datasets_train)
-    # wass_distances = [[] for _ in range(num_protected_groups)]
-    # logging_counters = [[] for _ in range(num_protected_groups)]
-    # protected_accuracies_list = [[] for _ in range(num_protected_groups)]
-    # biased_protected_accuracies_list = [[] for _ in range(num_protected_groups)]
-    # losses = []
-    # accuracies = []
     accuracies_list = []
     biased_accuracies_list = []
-
     loss_validation = []
     loss_validation_biased = []
-
     train_regret = []
 
     counter = 0
@@ -469,13 +450,10 @@ def run_regret_experiment_pytorch(
         batch_X, batch_y = global_batch
 
         if counter == 1:
-            # model.initialize_model(batch_X)
             model.initialize_model(batch_X.shape[1])
-            # model_biased.initialize_model(batch_X)
             model_biased.initialize_model(batch_X.shape[1])
             if exploration_hparams.decision_type == "counterfactual":
                 model_biased_prediction.initialize_model(batch_X.shape[1])
-                # model_biased_prediction.initialize_model(batch_X)
 
             optimizer_model = torch.optim.Adam(model.network.parameters(), lr=0.01)
             optimizer_biased = torch.optim.Adam(
@@ -485,10 +463,6 @@ def run_regret_experiment_pytorch(
         # TRAIN THE UNBIASED MODEL
         if training_mode == "full_minimization":
             unbiased_dataset.add_data(batch_X, batch_y)
-            # model = train_model(
-            # model, num_full_minimization_steps, unbiased_dataset, batch_size,
-            # restart_model_full_minimization = restart_model_full_minimization
-            # )
             print(
                 "Start of full minimization training of the unbiased model -- iteration ",
                 counter,
@@ -502,7 +476,6 @@ def run_regret_experiment_pytorch(
                 restart_model_full_minimization=restart_model_full_minimization,
                 eps=0.0001 * np.log(counter + 2) / 2,
             )
-
             gc.collect()
 
         elif training_mode == "gradient_step":
@@ -754,45 +727,25 @@ def run_regret_experiment_pytorch(
                 print("Biased TRAIN accuracy  ", biased_train_accuracy)
                 print("Biased TRAIN loss ", loss_train_biased)
 
-                print(
-                    "                                                               Baseline accuracy ",
-                    baseline_accuracy,
-                )
+                print(f"Baseline accuracy: {baseline_accuracy}")
                 # Compute the global accuracy.
-                print(
-                    "                                                               Unbiased Accuracy ",
-                    total_accuracy,
-                )
-
+                print(f"Unbiased Accuracy: {total_accuracy}")
                 # Compute the global accuracy.
-                print(
-                    "                                                               Biased Accuracy ",
-                    biased_total_accuracy,
-                )
+                print(f"Biased Accuracy {biased_total_accuracy}")
+                print(f"Validation Loss Unbiased: {loss_validation[-1]}")
+                print(f"Validation Loss Biased {loss_validation_biased[-1]}")
 
-                print(
-                    "                                                               Validation Loss Unbiased ",
-                    loss_validation[-1],
-                )
-
-                print(
-                    "                                                               Validation Loss Biased ",
-                    loss_validation_biased[-1],
-                )
-
-            test_biased_accuracies_cum_averages = np.cumsum(biased_accuracies_list)
-            test_biased_accuracies_cum_averages = (
-                test_biased_accuracies_cum_averages / (np.arange(len(timesteps)) + 1)
-            )
-            accuracies_cum_averages = np.cumsum(accuracies_list)
-            accuracies_cum_averages = accuracies_cum_averages / (
-                np.arange(len(timesteps)) + 1
-            )
-            train_biased_accuracies_cum_averages = np.cumsum(train_accuracies_biased)
-            train_biased_accuracies_cum_averages = (
-                train_biased_accuracies_cum_averages / (np.arange(len(timesteps)) + 1)
-            )
-            train_cum_regret = np.cumsum(train_regret)
+    test_biased_accuracies_cum_averages = np.cumsum(biased_accuracies_list)
+    test_biased_accuracies_cum_averages = test_biased_accuracies_cum_averages / (
+        np.arange(len(timesteps)) + 1
+    )
+    accuracies_cum_averages = np.cumsum(accuracies_list)
+    accuracies_cum_averages = accuracies_cum_averages / (np.arange(len(timesteps)) + 1)
+    train_biased_accuracies_cum_averages = np.cumsum(train_accuracies_biased)
+    train_biased_accuracies_cum_averages = train_biased_accuracies_cum_averages / (
+        np.arange(len(timesteps)) + 1
+    )
+    train_cum_regret = np.cumsum(train_regret)
 
     return (
         timesteps,
