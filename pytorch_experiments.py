@@ -3,25 +3,23 @@ import matplotlib.pyplot as plt
 
 # import ray
 import os
-
-# import pickle
+import pickle
+import time
 
 from dataclasses import dataclass
 from experiment_regret import run_regret_experiment_pytorch
 from typing import Any
 
 
-# matplotlib.use("Agg")
 # USE_RAY = True
 USE_RAY = False
-# TODO: fix w submitit
-# ray.init(ignore_reinit_error=True)
 
 LINEWIDTH = 3.5
 LINESTYLE = "dashed"
 STD_GAP = 0.5
 ALPHA = 0.1
 FAST = True
+# FAST = False
 
 
 @dataclass
@@ -31,6 +29,7 @@ class NNParams:
     max_num_steps = 30
     baseline_steps = 10000
     batch_size = 10
+    num_full_minimization_steps = 200
     random_init = True
 
 
@@ -60,22 +59,6 @@ class ExplorationHparams:
 
 
 @dataclass
-class BaselineResults:
-    mean_loss_validation_baseline_summary: Any
-    std_loss_validation_baseline_summary: Any
-    mean_accuracy_validation_baseline_summary: Any
-    std_accuracy_validation_baseline_summary: Any
-
-
-@dataclass
-class ValidationResults:
-    mean_loss_validation_averages: Any
-    std_loss_validation_averages: Any
-    mean_loss_validation_biased_averages: Any
-    std_loss_validation_biased_averages: Any
-
-
-@dataclass
 class ExperimentResults:
     mean_accuracies_cum_averages: Any
     std_accuracies_cum_averages: Any
@@ -85,8 +68,14 @@ class ExperimentResults:
     std_test_biased_accuracies_cum_averages: Any
     mean_train_cum_regret_averages: Any
     std_train_cum_regret_averages: Any
-    validation_results: ValidationResults
-    baseline_results: BaselineResults
+    mean_loss_validation_averages: Any
+    std_loss_validation_averages: Any
+    mean_loss_validation_biased_averages: Any
+    std_loss_validation_biased_averages: Any
+    mean_loss_validation_baseline_summary: Any
+    std_loss_validation_baseline_summary: Any
+    mean_accuracy_validation_baseline_summary: Any
+    std_accuracy_validation_baseline_summary: Any
 
 
 # @ray.remote
@@ -96,7 +85,8 @@ def run_experiment_parallel(
     nn_params,
     linear_model_hparams,
     exploration_hparams,
-    logging_frequency=100,
+    logging_frequency,
+    num_experiments,
 ):
     (
         timesteps,
@@ -114,7 +104,8 @@ def run_experiment_parallel(
         nn_params,
         linear_model_hparams,
         exploration_hparams,
-        logging_frequency=100,
+        logging_frequency,
+        num_experiments,
     )
     return (
         timesteps,
@@ -156,7 +147,7 @@ def configure_directories(dataset, nn_params, linear):
             print("Creation of figs directories failed")
         else:
             print("Successfully created the figs directory")
-    return network_type, base_figs_directory
+    return network_type, base_figs_directory, base_data_directory
 
 
 def run_experiments(
@@ -165,8 +156,8 @@ def run_experiments(
     nn_params,
     linear_model_hparams,
     exploration_hparams,
-    logging_frequency=100,
-    num_experiments=5,
+    logging_frequency,
+    num_experiments,
 ):
     # if USE_RAY:
     #     experiment_summaries = [
@@ -201,7 +192,8 @@ def run_experiments(
             nn_params,
             linear_model_hparams,
             exploration_hparams,
-            logging_frequency=100,
+            logging_frequency,
+            num_experiments,
         )
         for _ in range(num_experiments)
     ]
@@ -277,13 +269,6 @@ def analyze_experiments(
         loss_validation_biased_summary, axis=0
     )
     std_loss_validation_biased_averages = np.std(loss_validation_biased_summary, axis=0)
-    validation_results = ValidationResults(
-        mean_loss_validation_averages,
-        std_loss_validation_averages,
-        mean_loss_validation_biased_averages,
-        std_loss_validation_biased_averages,
-    )
-
     mean_loss_validation_baseline_summary = np.mean(loss_validation_baseline_summary)
     std_loss_validation_baseline_summary = np.std(loss_validation_baseline_summary)
 
@@ -293,13 +278,6 @@ def analyze_experiments(
     std_accuracy_validation_baseline_summary = np.std(
         accuracy_validation_baseline_summary
     )
-    baseline_results = BaselineResults(
-        mean_loss_validation_baseline_summary,
-        std_loss_validation_baseline_summary,
-        mean_accuracy_validation_baseline_summary,
-        std_accuracy_validation_baseline_summary,
-    )
-
     return ExperimentResults(
         mean_accuracies_cum_averages,
         std_accuracies_cum_averages,
@@ -309,12 +287,18 @@ def analyze_experiments(
         std_test_biased_accuracies_cum_averages,
         mean_train_cum_regret_averages,
         std_train_cum_regret_averages,
-        validation_results,
-        baseline_results,
+        mean_loss_validation_averages,
+        std_loss_validation_averages,
+        mean_loss_validation_biased_averages,
+        std_loss_validation_biased_averages,
+        mean_loss_validation_baseline_summary,
+        std_loss_validation_baseline_summary,
+        mean_accuracy_validation_baseline_summary,
+        std_accuracy_validation_baseline_summary,
     )
 
 
-def plot_accuracy(timesteps, accuracies, accuracies_stds, label, color):
+def plot_helper(timesteps, accuracies, accuracies_stds, label, color, broadcast=False):
     plt.plot(
         timesteps,
         accuracies,
@@ -323,20 +307,30 @@ def plot_accuracy(timesteps, accuracies, accuracies_stds, label, color):
         linewidth=LINEWIDTH,
         color=color,
     )
-    print(len(accuracies))
-    print(accuracies_stds)
-    print(accuracies)
-    # if len(accuracies)
-    gap = len(timesteps) * [STD_GAP]
-    plt.fill_between(
-        timesteps,
-        # accuracies - STD_GAP * accuracies_stds,
-        # accuracies + STD_GAP * accuracies_stds,
-        accuracies - gap * accuracies_stds,
-        accuracies + gap * accuracies_stds,
-        color=color,
-        alpha=ALPHA,
-    )
+    # print(f"Accuracies std: {accuracies_stds}")
+    # print(f"type Accuracies std: {type(accuracies_stds)}")
+    print("INSIDE PLOT HELPER")
+    print(f"Low Bound: {accuracies - STD_GAP * accuracies_stds}")
+    print(f"Type Low Bound: {type(accuracies - STD_GAP * accuracies_stds)}")
+    print(f"Timesteps: {timesteps}")
+    print(f"Type Timesteps: {type(timesteps)}")
+    if broadcast:
+        plt.fill_between(
+            timesteps,
+            [accuracies - STD_GAP * accuracies_stds] * len(timesteps),
+            [accuracies + STD_GAP * accuracies_stds] * len(timesteps),
+            color=color,
+            alpha=ALPHA,
+        )
+
+    else:
+        plt.fill_between(
+            timesteps,
+            accuracies - STD_GAP * accuracies_stds,
+            accuracies + STD_GAP * accuracies_stds,
+            color=color,
+            alpha=ALPHA,
+        )
 
 
 def plot_title(
@@ -441,41 +435,45 @@ def plot_results(
 ):
     # colors = ["blue", "red", "violet", "black"]
     # ACCURACY PLOTS
-    plot_accuracy(
+    print("Here are the experiment results: ")
+    print(experiment_results)
+    plot_helper(
         timesteps,
         experiment_results.mean_test_biased_accuracies_cum_averages,
         experiment_results.std_test_biased_accuracies_cum_averages,
         "Biased Model Test - no decision adjustment",
         "blue",
     )
-    plot_accuracy(
+    plot_helper(
         timesteps,
         experiment_results.mean_accuracies_cum_averages,
         experiment_results.std_accuracies_cum_averages,
         label="Unbiased Model Test - all data train",
         color="red",
     )
-    plot_accuracy(
+    plot_helper(
         timesteps,
         experiment_results.mean_train_biased_accuracies_cum_averages,
         experiment_results.std_train_biased_accuracies_cum_averages,
         label="Online Biased Model - filtered data train",
         color="violet",
     )
-    plot_accuracy(
-        timesteps,
-        [experiment_results.mean_train_biased_accuracies_cum_averages] * len(timesteps),
-        [experiment_results.std_train_biased_accuracies_cum_averages] * len(timesteps),
-        label="Baseline Accuracy",
-        color="black",
-    )
+    # plot_helper(
+    #     timesteps,
+    #     # np.array([experiment_results.mean_train_biased_accuracies_cum_averages] * len(timesteps)),
+    #     # np.array([experiment_results.std_train_biased_accuracies_cum_averages] * len(timesteps)),
+    #     experiment_results.mean_train_biased_accuracies_cum_averages,
+    #     experiment_results.std_train_biased_accuracies_cum_averages,
+    #     label="Baseline Accuracy",
+    #     color="black",
+    #     broadcast=False
+    # )
 
     plot_name = plot_title(
         "accuracy",
         dataset,
         network_type,
         training_mode,
-        experiment_results,
         exploration_hparams,
     )
     plt.xlabel("Timesteps")
@@ -483,6 +481,7 @@ def plot_results(
     # plt.legend(loc = "lower right")
     lg = plt.legend(bbox_to_anchor=(1.05, 1), fontsize=8, loc="upper left")
     # plt.tight_layout()
+    print(f"Saving plot to {base_figs_directory}/{plot_name}.png")
     plt.savefig(
         "{}/{}.png".format(base_figs_directory, plot_name),
         bbox_extra_artists=(lg,),
@@ -491,7 +490,7 @@ def plot_results(
     plt.close("all")
 
     # REGRET PLOTS
-    plot_accuracy(
+    plot_helper(
         timesteps,
         experiment_results.mean_train_cum_regret_averages,
         experiment_results.std_train_cum_regret_averages,
@@ -503,7 +502,6 @@ def plot_results(
         dataset,
         network_type,
         training_mode,
-        experiment_results,
         exploration_hparams,
     )
     plt.xlabel("Timesteps")
@@ -517,33 +515,35 @@ def plot_results(
     plt.close("all")
 
     # LOSS PLOTS
-    plot_accuracy(
+    plot_helper(
         timesteps,
-        experiment_results.validation_results.mean_loss_validation_averages,
-        experiment_results.validation_results.std_loss_validation_averages,
+        experiment_results.mean_loss_validation_averages,
+        experiment_results.std_loss_validation_averages,
         label="Unbiased model loss",
         color="blue",
     )
-    plot_accuracy(
+    plot_helper(
         timesteps,
-        experiment_results.validation_results.mean_loss_validation_biased_averages,
-        experiment_results.validation_results.std_loss_validation_biased_averages,
+        experiment_results.mean_loss_validation_biased_averages,
+        experiment_results.std_loss_validation_biased_averages,
         label="Biased model loss",
         color="red",
     )
-    plot_accuracy(
-        timesteps,
-        [experiment_results.mean_loss_validation_baseline_summary] * len(timesteps),
-        [experiment_results.std_loss_validation_baseline_summary] * len(timesteps),
-        label="Baseline Loss",
-        color="black",
-    )
+    # plot_helper(
+    #     timesteps,
+    #     # np.array([experiment_results.mean_loss_validation_baseline_summary] * len(timesteps)),
+    #     # np.array([experiment_results.std_loss_validation_baseline_summary] * len(timesteps)),
+    #     experiment_results.mean_loss_validation_baseline_summary,
+    #     experiment_results.std_loss_validation_baseline_summary,
+    #     label="Baseline Loss",
+    #     color="black",
+    #     broadcast=False,
+    # )
     plot_name = plot_title(
         "loss",
         dataset,
         network_type,
         training_mode,
-        experiment_results,
         exploration_hparams,
     )
     plt.xlabel("Timesteps")
@@ -564,13 +564,14 @@ def run_and_plot(
     nn_params,
     linear_model_hparams,
     exploration_hparams,
-    logging_frequency=100,
-    num_experiments=5,
+    logging_frequency,
+    num_experiments,
 ):
     # ray.init()
     # TODO: seems silly.
+    start_time = time.time()
     linear = False
-    network_type, base_figs_directory = configure_directories(
+    network_type, base_figs_directory, base_data_directory = configure_directories(
         dataset, nn_params, linear
     )
     if exploration_hparams.epsilon_greedy and exploration_hparams.adjust_mahalanobis:
@@ -586,8 +587,8 @@ def run_and_plot(
         nn_params,
         linear_model_hparams,
         exploration_hparams,
-        logging_frequency=100,
-        num_experiments=5,
+        logging_frequency,
+        num_experiments,
     )
     experiment_results = analyze_experiments(
         experiment_summaries,
@@ -609,23 +610,26 @@ def run_and_plot(
         training_mode,
         exploration_hparams,
     )
-    # pickle.dump(
-    #     (
-    #         timesteps,
-    #         mean_test_biased_accuracies_cum_averages,
-    #         std_test_biased_accuracies_cum_averages,
-    #         mean_accuracies_cum_averages,
-    #         std_accuracies_cum_averages,
-    #         mean_train_biased_accuracies_cum_averages,
-    #         std_train_biased_accuracies_cum_averages,
-    #         max_num_steps,
-    #         mean_loss_validation_averages,
-    #         std_loss_validation_averages,
-    #         mean_loss_validation_biased_averages,
-    #         std_loss_validation_biased_averages,
-    #     ),
-    #     open("{}/{}.p".format(base_data_directory, plot_name), "wb"),
-    # )
+    pickle.dump(
+        (
+            timesteps,
+            nn_params.max_num_steps,
+            experiment_results.mean_test_biased_accuracies_cum_averages,
+            experiment_results.std_test_biased_accuracies_cum_averages,
+            experiment_results.mean_accuracies_cum_averages,
+            experiment_results.std_accuracies_cum_averages,
+            experiment_results.mean_train_biased_accuracies_cum_averages,
+            experiment_results.std_train_biased_accuracies_cum_averages,
+            experiment_results.mean_loss_validation_averages,
+            experiment_results.std_loss_validation_averages,
+            experiment_results.mean_loss_validation_biased_averages,
+            experiment_results.std_loss_validation_biased_averages,
+        ),
+        open("{}/{}.p".format(base_data_directory, "data_dump"), "wb"),
+    )
+    end_time = time.time()
+    total = end_time - start_time
+    print(f"Total runtime: {total}")
 
 
 if __name__ == "__main__":
@@ -635,13 +639,13 @@ if __name__ == "__main__":
     linear_model_hparams = LinearModelHparams()
     exploration_hparams = ExplorationHparams()
     if FAST:
-        nn_params.max_num_steps = 2
+        nn_params.max_num_steps = 3
         nn_params.baseline_steps = 10
-        training_mode = "gradient_step"
-        exploration_hparams.decision_type = "simple"
-
-    num_experiments = 5
-    logging_frequency = 10
+        # training_mode = "gradient_step"
+        # exploration_hparams.decision_type = "simple"
+    # TODO
+    num_experiments = 1
+    logging_frequency = 1
     run_and_plot(
         dataset,
         training_mode,

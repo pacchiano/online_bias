@@ -2,12 +2,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import matplotlib
 import numpy as np
 
-import requests
 import pandas as pd
-import matplotlib.pyplot as plt
 from six.moves import cPickle
 from sklearn import model_selection
 
@@ -112,125 +109,125 @@ def get_data_nonuai(url, test=False):
     return df
 
 
-def read_and_preprocess_adult_data_nonuai(joint_protected_groups=True):
-
-    train_df_raw = get_data(AdultParams.PATH_TRAIN)
-    test_df_raw = get_data(AdultParams.PATH_TEST, test=True)
-
-    for column in train_df_raw.columns:
-        if train_df_raw[column].dtype.name == "category":
-            categories_1 = set(train_df_raw[column].cat.categories)
-            categories_2 = set(test_df_raw[column].cat.categories)
-            categories = sorted(categories_1 | categories_2)
-            train_df_raw[column].cat.set_categories(categories, inplace=True)
-            test_df_raw[column].cat.set_categories(categories, inplace=True)
-
-    train_df_raw.dropna(inplace=True)
-    test_df_raw.dropna(inplace=True)
-
-    train_df_raw[AdultParams.LABEL_COLUMN] = (
-        train_df_raw["income_bracket"].apply(lambda x: ">50K" in x)
-    ).astype(int)
-    test_df_raw[AdultParams.LABEL_COLUMN] = (
-        test_df_raw["income_bracket"].apply(lambda x: ">50K" in x)
-    ).astype(int)
-
-    # Preprocessing Features
-    pd.options.mode.chained_assignment = None  # default='warn'
-
-    # Functions for preprocessing categorical and continuous columns.
-    def binarize_categorical_columns(
-        input_train_df, input_test_df, categorical_columns=[]
-    ):
-        def fix_columns(input_train_df, input_test_df):
-            test_df_missing_cols = set(input_train_df.columns) - set(
-                input_test_df.columns
-            )
-            for c in test_df_missing_cols:
-                input_test_df[c] = 0
-            train_df_missing_cols = set(input_test_df.columns) - set(
-                input_train_df.columns
-            )
-            for c in train_df_missing_cols:
-                input_train_df[c] = 0
-            input_train_df = input_train_df[input_test_df.columns]
-            return input_train_df, input_test_df
-
-        # Binarize categorical columns.
-        binarized_train_df = pd.get_dummies(input_train_df, columns=categorical_columns)
-        binarized_test_df = pd.get_dummies(input_test_df, columns=categorical_columns)
-        # Make sure the train and test dataframes have the same binarized columns.
-        fixed_train_df, fixed_test_df = fix_columns(
-            binarized_train_df, binarized_test_df
-        )
-        return fixed_train_df, fixed_test_df
-
-    def bucketize_continuous_column(
-        input_train_df,
-        input_test_df,
-        continuous_column_name,
-        num_quantiles=None,
-        bins=None,
-    ):
-        assert num_quantiles is None or bins is None
-        if num_quantiles is not None:
-            train_quantized, bins_quantized = pd.qcut(
-                input_train_df[continuous_column_name],
-                num_quantiles,
-                retbins=True,
-                labels=False,
-            )
-            input_train_df[continuous_column_name] = pd.cut(
-                input_train_df[continuous_column_name], bins_quantized, labels=False
-            )
-            input_test_df[continuous_column_name] = pd.cut(
-                input_test_df[continuous_column_name], bins_quantized, labels=False
-            )
-        elif bins is not None:
-            input_train_df[continuous_column_name] = pd.cut(
-                input_train_df[continuous_column_name], bins, labels=False
-            )
-            input_test_df[continuous_column_name] = pd.cut(
-                input_test_df[continuous_column_name], bins, labels=False
-            )
-
-    # Filter out all columns except the ones specified.
-    train_df = train_df_raw[
-        AdultParams.CATEGORICAL_COLUMNS
-        + AdultParams.CONTINUOUS_COLUMNS
-        + [AdultParams.LABEL_COLUMN]
-    ]
-    test_df = test_df_raw[
-        AdultParams.CATEGORICAL_COLUMNS
-        + AdultParams.CONTINUOUS_COLUMNS
-        + [AdultParams.LABEL_COLUMN]
-    ]
-
-    # Bucketize continuous columns.
-    bucketize_continuous_column(train_df, test_df, "age", num_quantiles=4)
-    bucketize_continuous_column(
-        train_df, test_df, "capital_gain", bins=[-1, 1, 4000, 10000, 100000]
-    )
-    bucketize_continuous_column(
-        train_df, test_df, "capital_loss", bins=[-1, 1, 1800, 1950, 4500]
-    )
-    bucketize_continuous_column(
-        train_df, test_df, "hours_per_week", bins=[0, 39, 41, 50, 100]
-    )
-    bucketize_continuous_column(
-        train_df, test_df, "education_num", bins=[0, 8, 9, 11, 16]
-    )
-    train_df, test_df = binarize_categorical_columns(
-        train_df,
-        test_df,
-        categorical_columns=AdultParams.CATEGORICAL_COLUMNS
-        + AdultParams.CONTINUOUS_COLUMNS,
-    )
-    feature_names = list(train_df.keys())
-    feature_names.remove(AdultParams.LABEL_COLUMN)
-    num_features = len(feature_names)
-
-    return train_df, test_df, feature_names
+# def read_and_preprocess_adult_data_nonuai(joint_protected_groups=True):
+#
+#     train_df_raw = get_data(AdultParams.PATH_TRAIN)
+#     test_df_raw = get_data(AdultParams.PATH_TEST, test=True)
+#
+#     for column in train_df_raw.columns:
+#         if train_df_raw[column].dtype.name == "category":
+#             categories_1 = set(train_df_raw[column].cat.categories)
+#             categories_2 = set(test_df_raw[column].cat.categories)
+#             categories = sorted(categories_1 | categories_2)
+#             train_df_raw[column].cat.set_categories(categories, inplace=True)
+#             test_df_raw[column].cat.set_categories(categories, inplace=True)
+#
+#     train_df_raw.dropna(inplace=True)
+#     test_df_raw.dropna(inplace=True)
+#
+#     train_df_raw[AdultParams.LABEL_COLUMN] = (
+#         train_df_raw["income_bracket"].apply(lambda x: ">50K" in x)
+#     ).astype(int)
+#     test_df_raw[AdultParams.LABEL_COLUMN] = (
+#         test_df_raw["income_bracket"].apply(lambda x: ">50K" in x)
+#     ).astype(int)
+#
+#     # Preprocessing Features
+#     pd.options.mode.chained_assignment = None  # default='warn'
+#
+#     # Functions for preprocessing categorical and continuous columns.
+#     def binarize_categorical_columns(
+#         input_train_df, input_test_df, categorical_columns=[]
+#     ):
+#         def fix_columns(input_train_df, input_test_df):
+#             test_df_missing_cols = set(input_train_df.columns) - set(
+#                 input_test_df.columns
+#             )
+#             for c in test_df_missing_cols:
+#                 input_test_df[c] = 0
+#             train_df_missing_cols = set(input_test_df.columns) - set(
+#                 input_train_df.columns
+#             )
+#             for c in train_df_missing_cols:
+#                 input_train_df[c] = 0
+#             input_train_df = input_train_df[input_test_df.columns]
+#             return input_train_df, input_test_df
+#
+#         # Binarize categorical columns.
+#         binarized_train_df = pd.get_dummies(input_train_df, columns=categorical_columns)
+#         binarized_test_df = pd.get_dummies(input_test_df, columns=categorical_columns)
+#         # Make sure the train and test dataframes have the same binarized columns.
+#         fixed_train_df, fixed_test_df = fix_columns(
+#             binarized_train_df, binarized_test_df
+#         )
+#         return fixed_train_df, fixed_test_df
+#
+#     def bucketize_continuous_column(
+#         input_train_df,
+#         input_test_df,
+#         continuous_column_name,
+#         num_quantiles=None,
+#         bins=None,
+#     ):
+#         assert num_quantiles is None or bins is None
+#         if num_quantiles is not None:
+#             train_quantized, bins_quantized = pd.qcut(
+#                 input_train_df[continuous_column_name],
+#                 num_quantiles,
+#                 retbins=True,
+#                 labels=False,
+#             )
+#             input_train_df[continuous_column_name] = pd.cut(
+#                 input_train_df[continuous_column_name], bins_quantized, labels=False
+#             )
+#             input_test_df[continuous_column_name] = pd.cut(
+#                 input_test_df[continuous_column_name], bins_quantized, labels=False
+#             )
+#         elif bins is not None:
+#             input_train_df[continuous_column_name] = pd.cut(
+#                 input_train_df[continuous_column_name], bins, labels=False
+#             )
+#             input_test_df[continuous_column_name] = pd.cut(
+#                 input_test_df[continuous_column_name], bins, labels=False
+#             )
+#
+#     # Filter out all columns except the ones specified.
+#     train_df = train_df_raw[
+#         AdultParams.CATEGORICAL_COLUMNS
+#         + AdultParams.CONTINUOUS_COLUMNS
+#         + [AdultParams.LABEL_COLUMN]
+#     ]
+#     test_df = test_df_raw[
+#         AdultParams.CATEGORICAL_COLUMNS
+#         + AdultParams.CONTINUOUS_COLUMNS
+#         + [AdultParams.LABEL_COLUMN]
+#     ]
+#
+#     # Bucketize continuous columns.
+#     bucketize_continuous_column(train_df, test_df, "age", num_quantiles=4)
+#     bucketize_continuous_column(
+#         train_df, test_df, "capital_gain", bins=[-1, 1, 4000, 10000, 100000]
+#     )
+#     bucketize_continuous_column(
+#         train_df, test_df, "capital_loss", bins=[-1, 1, 1800, 1950, 4500]
+#     )
+#     bucketize_continuous_column(
+#         train_df, test_df, "hours_per_week", bins=[0, 39, 41, 50, 100]
+#     )
+#     bucketize_continuous_column(
+#         train_df, test_df, "education_num", bins=[0, 8, 9, 11, 16]
+#     )
+#     train_df, test_df = binarize_categorical_columns(
+#         train_df,
+#         test_df,
+#         categorical_columns=AdultParams.CATEGORICAL_COLUMNS
+#         + AdultParams.CONTINUOUS_COLUMNS,
+#     )
+#     feature_names = list(train_df.keys())
+#     feature_names.remove(AdultParams.LABEL_COLUMN)
+#     num_features = len(feature_names)
+#
+#     return train_df, test_df, feature_names
 
 
 _COLUMNS = (
@@ -302,8 +299,8 @@ def _combine_category_coding(df_1, df_2):
 
 def read_all_data(remove_missing=True):
     """Return (train, test) dataframes, optionally removing incomplete rows."""
-    train_data = _read_data("./adult.data")
-    test_data = _read_data("./adult.test")
+    train_data = _read_data("./datasets/adult.data")
+    test_data = _read_data("./datasets/adult.test")
     _combine_category_coding(train_data, test_data)
     if remove_missing:
         train_data = train_data.dropna()

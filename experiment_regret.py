@@ -289,7 +289,7 @@ def compute_loss_confidence_band_with_stopping(
     # raise ValueError("asdflkm")
     if bottom_half:
         loss_values.sort()
-        loss_values = loss_values[0 : int(len(loss_values) / 2)]
+        loss_values = loss_values[0: int(len(loss_values) / 2)]
     return np.std(loss_values), np.mean(loss_values)
 
 
@@ -320,7 +320,7 @@ def compute_loss_confidence_band(
 
     if bottom_half:
         loss_values.sort()
-        loss_values = loss_values[0 : int(len(loss_values) / 2)]
+        loss_values = loss_values[0: int(len(loss_values) / 2)]
 
     return np.std(loss_values), np.mean(loss_values)
 
@@ -341,13 +341,13 @@ def run_regret_experiment_pytorch(
     nn_params,
     linear_model_hparams,
     exploration_hparams,
-    logging_frequency=100,
-    num_experiments=5,
+    logging_frequency,
+    num_experiments,
 ):
     # TODO: remove/pull up into hparams
     regret_wrt_baseline = True
     MLP = True
-    num_full_minimization_steps = 200
+    num_full_minimization_steps = nn_params.num_full_minimization_steps
     verbose = True
     restart_model_full_minimization = True
     estimate_loss_confidence_band = True
@@ -666,7 +666,12 @@ def run_regret_experiment_pytorch(
 
         # DIAGNOSTICS
         # Compute accuracy diagnostics
+        print("IS IT TIME TO LOG?!?")
+        print(f"counter: {counter}")
+        print(f"logging_frequency: {logging_frequency}")
+        print(f"{counter % logging_frequency}")
         if counter % logging_frequency * 1.0 == 0:
+            print("IT'S TIME TO LOG!")
             train_regret.append(batch_regret)
             train_accuracies_biased.append(biased_train_accuracy)
             timesteps.append(counter)
@@ -747,6 +752,9 @@ def run_regret_experiment_pytorch(
     )
     train_cum_regret = np.cumsum(train_regret)
 
+    print("Test Biases Accuracies: ")
+    print(test_biased_accuracies_cum_averages)
+    print("\n")
     return (
         timesteps,
         test_biased_accuracies_cum_averages,
