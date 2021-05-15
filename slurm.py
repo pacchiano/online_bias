@@ -16,7 +16,7 @@ from pytorch_experiments import (
 
 PARALLEL = True
 FAST = False
-VERSION = 1
+VERSION = 7
 
 JOB_PREFIX = "fair_bandits_test"
 PARALLEL_STR = "_parallel" if PARALLEL else ""
@@ -70,10 +70,12 @@ def get_parallel_args():
     )
     nn_params = NNParams()
     nn_params_2 = NNParams()
-    nn_params_2.representation_layer_size = 40
     nn_params_3 = NNParams()
+    nn_params_2.representation_layer_size = 40
     nn_params_3.representation_layer_size = 100
     nn_param_list = [nn_params, nn_params_2, nn_params_3] * 2
+    for nn_param in nn_param_list:
+        nn_param.max_num_steps = 200
 
     linear_model_hparams = [LinearModelHparams()] * 6
     exploration_hparams = [ExplorationHparams()] * 6
@@ -88,6 +90,7 @@ def get_parallel_args():
 def get_args():
     dataset = "MultiSVM"
     nn_params = NNParams()
+    nn_params.max_num_steps = 200
     linear_model_hparams = LinearModelHparams()
     exploration_hparams = ExplorationHparams()
     logging_frequency = 10

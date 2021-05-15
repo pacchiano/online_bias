@@ -15,6 +15,7 @@ from models import (
 )
 
 
+# TODO: why fixed steps?
 def train_model(
     model,
     num_steps,
@@ -23,7 +24,6 @@ def train_model(
     verbose=False,
     restart_model_full_minimization=True,
 ):
-
     for i in range(num_steps):
         if verbose:
             print("train model iteration ", i)
@@ -33,6 +33,7 @@ def train_model(
             if restart_model_full_minimization:
                 model.initialize_model(batch_X.shape[1])
             # model.initialize_model(batch_X)
+            # TODO: extract nn learning rate?
             optimizer = torch.optim.Adam(model.network.parameters(), lr=0.01)
 
         optimizer.zero_grad()
@@ -263,6 +264,7 @@ def compute_loss_confidence_band_with_stopping(
     batch_size,
     bottom_half=False,
     eps=0.0001,
+    verbose=False,
 ):
     loss_values = []
     for i in range(num_loss_samples):
@@ -271,7 +273,7 @@ def compute_loss_confidence_band_with_stopping(
             min_epoch_size,
             train_dataset,
             batch_size,
-            verbose=True,
+            verbose=verbose,
             restart_model_full_minimization=True,
             eps=eps,
             max_epochs=6,
@@ -348,7 +350,7 @@ def run_regret_experiment_pytorch(
     regret_wrt_baseline = True
     MLP = True
     num_full_minimization_steps = nn_params.num_full_minimization_steps
-    verbose = True
+    verbose = False
     restart_model_full_minimization = True
     estimate_loss_confidence_band = True
 
@@ -357,7 +359,11 @@ def run_regret_experiment_pytorch(
         protected_datasets_test,
         train_dataset,
         test_dataset,
-    ) = get_dataset(dataset, nn_params.batch_size, 1000)
+    ) = get_dataset(
+        dataset=dataset,
+        batch_size=nn_params.batch_size,
+        test_batch_size=1000
+    )
     baseline_model = TorchBinaryLogisticRegression(
         random_init=nn_params.random_init,
         fit_intercept=linear_model_hparams.fit_intercept,
@@ -372,7 +378,7 @@ def run_regret_experiment_pytorch(
                 "Decision type set to counterfactual, can't set exploration constants."
             )
     # TODO
-    if dataset == "MNIST":
+    if dataset == "MNIST" or dataset == "Adult":
         baseline_batch_size = nn_params.batch_size
     else:
         baseline_batch_size = 10
@@ -464,7 +470,7 @@ def run_regret_experiment_pytorch(
         if training_mode == "full_minimization":
             unbiased_dataset.add_data(batch_X, batch_y)
             print(
-                "Start of full minimization training of the unbiased model -- iteration ",
+                "Start of full minimization training of the unbiased model -- timestep ",
                 counter,
             )
             model = train_model_with_stopping(
@@ -472,7 +478,7 @@ def run_regret_experiment_pytorch(
                 num_full_minimization_steps,
                 unbiased_dataset,
                 nn_params.batch_size,
-                verbose=True,
+                verbose=verbose,
                 restart_model_full_minimization=restart_model_full_minimization,
                 eps=0.0001 * np.log(counter + 2) / 2,
             )
@@ -624,7 +630,7 @@ def run_regret_experiment_pytorch(
                     num_full_minimization_steps,
                     biased_dataset,
                     nn_params.batch_size,
-                    verbose=True,
+                    verbose=verbose,
                     restart_model_full_minimization=restart_model_full_minimization,
                     eps=0.0001 * np.log(counter + 2) / 2,
                 )
@@ -666,12 +672,7 @@ def run_regret_experiment_pytorch(
 
         # DIAGNOSTICS
         # Compute accuracy diagnostics
-        print("IS IT TIME TO LOG?!?")
-        print(f"counter: {counter}")
-        print(f"logging_frequency: {logging_frequency}")
-        print(f"{counter % logging_frequency}")
         if counter % logging_frequency * 1.0 == 0:
-            print("IT'S TIME TO LOG!")
             train_regret.append(batch_regret)
             train_accuracies_biased.append(biased_train_accuracy)
             timesteps.append(counter)
@@ -710,6 +711,8 @@ def run_regret_experiment_pytorch(
             biased_accuracies_list.append(biased_total_accuracy)
 
             # Compute training biased accuracy
+            # TODO: this errors sometimes! is this too big?
+            # TODO: dataset_X is a list, not numpy.
             train_biased_batch = biased_dataset.get_batch(1000)
             biased_train_accuracy = get_accuracies_simple(
                 train_biased_batch, model_biased, linear_model_hparams.threshold
