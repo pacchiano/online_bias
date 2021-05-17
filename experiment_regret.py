@@ -12,6 +12,7 @@ from models import (
     get_predictions,
     get_accuracies,
     get_accuracies_simple,
+    get_error_breakdown
 )
 
 
@@ -200,15 +201,15 @@ def train_model_counterfactual_with_stopping(
     while loss_final > loss_initial + loss_confidence_band:
 
         # print("Recomputing .... ")
-        print(
-            "Start training of conterfactual model",
-            "loss initial ",
-            loss_initial,
-            " loss confidence band ",
-            loss_confidence_band,
-            " loss_final ",
-            loss_final,
-        )
+        # print(
+        #     "Start training of conterfactual model",
+        #     "loss initial ",
+        #     loss_initial,
+        #     " loss confidence band ",
+        #     loss_confidence_band,
+        #     " loss_final ",
+        #     loss_final,
+        # )
         model = train_model_counterfactual(
             model,
             epoch_size,
@@ -224,7 +225,7 @@ def train_model_counterfactual_with_stopping(
         counterfactual_reg *= 0.5 * counterfactual_reg
         curr_epoch_index += 1
         epoch_size *= 2
-        print("Counterfactual epoch ", curr_epoch_index)
+        # print("Counterfactual epoch ", curr_epoch_index)
 
         if curr_epoch_index % eps_epoch_cycle == 0:
             loss_confidence_band *= 5
@@ -242,16 +243,6 @@ def train_model_counterfactual_with_stopping(
         # EVALUATE THE EXPECTED LOSS
         with torch.no_grad():
             loss_final = model.get_loss(all_data_X, all_data_Y)
-
-    print(
-        "Start training of conterfactual model",
-        "loss initial ",
-        loss_initial,
-        " loss confidence band ",
-        loss_confidence_band,
-        " loss_final ",
-        loss_final,
-    )
 
     return model
 
@@ -344,7 +335,6 @@ def run_regret_experiment_pytorch(
     linear_model_hparams,
     exploration_hparams,
     logging_frequency,
-    num_experiments,
 ):
     # TODO: remove/pull up into hparams
     regret_wrt_baseline = True
@@ -392,7 +382,7 @@ def run_regret_experiment_pytorch(
         baseline_batch_test, protected_batches_test = get_batches(
             protected_datasets_test, test_dataset, 1000
         )
-        baseline_accuracy, protected_accuracies = get_accuracies(
+        baseline_accuracy, _ = get_accuracies(
             baseline_batch_test,
             protected_batches_test,
             baseline_model,
@@ -406,6 +396,7 @@ def run_regret_experiment_pytorch(
 
     accuracies_list = []
     biased_accuracies_list = []
+    error_breakdown_list = []
     loss_validation = []
     loss_validation_biased = []
     train_regret = []
@@ -515,7 +506,10 @@ def run_regret_experiment_pytorch(
                 with torch.no_grad():
                     all_data_X, all_data_Y = biased_dataset.get_batch(10000000000)
                     loss_initial = model_biased.get_loss(all_data_X, all_data_Y)
-                if estimate_loss_confidence_band:
+
+                if exploration_hparams.loss_confidence_band is not None:
+                    loss_confidence_band = exploration_hparams.loss_confidence_band
+                elif estimate_loss_confidence_band:
                     print("Starting computation of the loss confidence band ")
                     (
                         loss_confidence_band,
@@ -538,6 +532,10 @@ def run_regret_experiment_pytorch(
                     gc.collect()
                 else:
                     loss_confidence_band = loss_initial
+
+                # TODO: this is really small always...
+                # print('HERE WE HAVE THE LOSS CONFIDENCE BAND: \n')
+                # print(loss_confidence_band)
 
                 counterfactual_reg = 1  # COUNTERFACTUAL REGULARIZATION
 
@@ -680,10 +678,7 @@ def run_regret_experiment_pytorch(
                 protected_datasets_test, test_dataset, 1000
             )
             batch_X_test, batch_y_test = global_batch_test
-            global_probabilities_list, protected_predictions = get_predictions(
-                global_batch_test, protected_batches_test, model
-            )
-            total_accuracy, protected_accuracies = get_accuracies(
+            total_accuracy, _ = get_accuracies(
                 global_batch_test,
                 protected_batches_test,
                 model,
@@ -698,18 +693,19 @@ def run_regret_experiment_pytorch(
                 loss_validation_biased.append(biased_loss.detach())
 
             accuracies_list.append(total_accuracy)
-            (
-                biased_global_probabilities_list,
-                biased_protected_predictions,
-            ) = get_predictions(global_batch_test, protected_batches_test, model_biased)
-            biased_total_accuracy, biased_protected_accuracies = get_accuracies(
+            biased_total_accuracy, _ = get_accuracies(
                 global_batch_test,
                 protected_batches_test,
                 model_biased,
                 linear_model_hparams.threshold,
             )
             biased_accuracies_list.append(biased_total_accuracy)
-
+            breakdown = get_error_breakdown(
+                global_batch_test,
+                model_biased,
+                linear_model_hparams.threshold,
+            )
+            error_breakdown_list.append(breakdown)
             # Compute training biased accuracy
             # TODO: this errors sometimes! is this too big?
             # TODO: dataset_X is a list, not numpy.
@@ -758,6 +754,9 @@ def run_regret_experiment_pytorch(
     print("Test Biases Accuracies: ")
     print(test_biased_accuracies_cum_averages)
     print("\n")
+    print("Error breakdowns: ")
+    print(error_breakdown_list)
+    print("\n")
     return (
         timesteps,
         test_biased_accuracies_cum_averages,
@@ -768,4 +767,5 @@ def run_regret_experiment_pytorch(
         loss_validation_biased,
         loss_validation_baseline,
         baseline_accuracy,
+        error_breakdown_list,
     )

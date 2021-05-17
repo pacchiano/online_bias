@@ -1,10 +1,15 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
+
+from dataclasses import dataclass
+
+
+@dataclass
+class Breakdown:
+    fpr: float
+    fnr: float
+    weight_norm: float
 
 
 class Feedforward(torch.nn.Module):
@@ -217,6 +222,17 @@ class TorchBinaryLogisticRegression:
         boolean_predictions = thresholded_predictions == batch_y
         return (boolean_predictions * 1.0).mean()
 
+    def get_breakdown(self, batch_X, batch_y, threshold, inverse_data_covariance=[]):
+        thresholded_predictions = self.get_predictions(
+            batch_X, threshold, inverse_data_covariance
+        )
+        # False Positive
+        false_positive = np.bitwise_and(thresholded_predictions == 1, batch_y == 0)
+        false_negative = np.bitwise_and(thresholded_predictions == 0, batch_y == 1)
+        with torch.no_grad():
+            norm = (torch.linalg.norm(self.network.fc1.weight) + torch.linalg.norm(self.network.fc2.weight)).item()
+        return Breakdown(false_positive.mean(), false_negative.mean(), norm)
+
     def plot(self, x_min, x_max, num_points=100):
         x_space = np.linspace(x_min, x_max, num_points)
         y_values = []
@@ -244,6 +260,12 @@ def get_predictions(global_batch, protected_batches, model, inverse_data_covaria
     ]
     global_prediction = model.predict_prob(batch_X, inverse_data_covariance)
     return global_prediction, protected_predictions
+
+
+def get_error_breakdown(global_batch, model, threshold):
+    batch_X, batch_y = global_batch
+    breakdown = model.get_breakdown(batch_X, batch_y, threshold)
+    return breakdown
 
 
 def get_accuracies(global_batch, protected_batches, model, threshold):

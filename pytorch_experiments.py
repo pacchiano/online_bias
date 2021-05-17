@@ -1,9 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-# import ray
 import os
 import pickle
+import ray
 import time
 
 from dataclasses import dataclass
@@ -11,15 +11,15 @@ from experiment_regret import run_regret_experiment_pytorch
 from typing import Any
 
 
-# USE_RAY = True
-USE_RAY = False
+USE_RAY = True
+# USE_RAY = False
 
 LINEWIDTH = 3.5
 LINESTYLE = "dashed"
 STD_GAP = 0.5
 ALPHA = 0.1
-FAST = True
-# FAST = False
+# FAST = True
+FAST = False
 
 
 @dataclass
@@ -28,7 +28,7 @@ class NNParams:
     representation_layer_size = 10
     max_num_steps = 200
     baseline_steps = 10000
-    batch_size = 10
+    batch_size = 32
     num_full_minimization_steps = 200
     random_init = True
 
@@ -56,6 +56,7 @@ class ExplorationHparams:
     # TODO
     epsilon_greedy = False
     adjust_mahalanobis = False
+    loss_confidence_band = None
 
 
 @dataclass
@@ -78,7 +79,15 @@ class ExperimentResults:
     std_accuracy_validation_baseline_summary: Any
 
 
-# @ray.remote
+def conditionally(dec, cond):
+    def resdec(f):
+        if not cond:
+            return f
+        return dec(f)
+    return resdec
+
+
+@conditionally(ray.remote, USE_RAY)
 def run_experiment_parallel(
     dataset,
     training_mode,
@@ -86,7 +95,6 @@ def run_experiment_parallel(
     linear_model_hparams,
     exploration_hparams,
     logging_frequency,
-    num_experiments,
 ):
     (
         timesteps,
@@ -98,6 +106,7 @@ def run_experiment_parallel(
         loss_validation_biased,
         loss_baseline,
         baseline_accuracy,
+        error_breakdown
     ) = run_regret_experiment_pytorch(
         dataset,
         training_mode,
@@ -105,7 +114,6 @@ def run_experiment_parallel(
         linear_model_hparams,
         exploration_hparams,
         logging_frequency,
-        num_experiments,
     )
     return (
         timesteps,
@@ -117,6 +125,7 @@ def run_experiment_parallel(
         loss_validation_biased,
         loss_baseline,
         baseline_accuracy,
+        error_breakdown
     )
 
 
@@ -159,44 +168,43 @@ def run_experiments(
     logging_frequency,
     num_experiments,
 ):
-    # if USE_RAY:
-    #     experiment_summaries = [
-    #         run_experiment_parallel.remote(
-    #             dataset,
-    #             training_mode,
-    #             nn_params,
-    #             linear_model_hparams,
-    #             exploration_hparams,
-    #             logging_frequency=100,
-    #         )
-    #         for _ in range(num_experiments)
-    #     ]
-    #     experiment_summaries = ray.get(experiment_summaries)
+    if USE_RAY:
+        experiment_summaries = [
+            run_experiment_parallel.remote(
+                dataset,
+                training_mode,
+                nn_params,
+                linear_model_hparams,
+                exploration_hparams,
+                logging_frequency,
+            )
+            for _ in range(num_experiments)
+        ]
+        experiment_summaries = ray.get(experiment_summaries)
 
-    # else:
-    #     experiment_summaries = [
-    #         run_experiment_parallel(
-    #             dataset,
-    #             training_mode,
-    #             nn_params,
-    #             linear_model_hparams,
-    #             exploration_hparams,
-    #             logging_frequency=100,
-    #         )
-    #         for _ in range(num_experiments)
-    #     ]
-    experiment_summaries = [
-        run_experiment_parallel(
-            dataset,
-            training_mode,
-            nn_params,
-            linear_model_hparams,
-            exploration_hparams,
-            logging_frequency,
-            num_experiments,
-        )
-        for _ in range(num_experiments)
-    ]
+    else:
+        experiment_summaries = [
+            run_experiment_parallel(
+                dataset,
+                training_mode,
+                nn_params,
+                linear_model_hparams,
+                exploration_hparams,
+                logging_frequency,
+            )
+            for _ in range(num_experiments)
+        ]
+    # experiment_summaries = [
+    #     run_experiment_parallel(
+    #         dataset,
+    #         training_mode,
+    #         nn_params,
+    #         linear_model_hparams,
+    #         exploration_hparams,
+    #         logging_frequency,
+    #     )
+    #     for _ in range(num_experiments)
+    # ]
     return experiment_summaries
 
 
@@ -415,7 +423,6 @@ def plot_title(
     return plot_name
 
 
-# TODO: fix baseline plots.
 def plot_results(
     timesteps,
     experiment_results,
@@ -426,8 +433,6 @@ def plot_results(
     exploration_hparams,
 ):
     # ACCURACY PLOTS
-    # print("Here are the experiment results: ")
-    # print(experiment_results)
     plot_helper(
         timesteps,
         experiment_results.mean_test_biased_accuracies_cum_averages,
@@ -443,6 +448,7 @@ def plot_results(
         label="Unbiased Model Test - all data train",
         color="red",
     )
+    # TODO: this looks like the right dataset, why does it seem buggy?
     plot_helper(
         timesteps,
         experiment_results.mean_train_biased_accuracies_cum_averages,
@@ -553,7 +559,8 @@ def run_and_plot(
     logging_frequency,
     num_experiments,
 ):
-    # ray.init()
+    # TODO?
+    ray.init()
     start_time = time.time()
     linear = False
     network_type, base_figs_directory, base_data_directory = configure_directories(
@@ -612,13 +619,20 @@ def run_and_plot(
         ),
         open("{}/{}.p".format(base_data_directory, "data_dump"), "wb"),
     )
+    # print(f"FPR and FNR: {experiment_summaries[-1][-1]}")
+    pickle.dump(
+        # FPR/FNR
+        experiment_summaries[-1],
+        open("{}/{}.p".format(base_data_directory, "fnr_dump"), "wb"),
+    )
     end_time = time.time()
     total = end_time - start_time
     print(f"Total runtime: {total}")
 
 
 if __name__ == "__main__":
-    dataset = "MultiSVM"
+    # dataset = "MultiSVM"
+    dataset = "MNIST"
     training_mode = "full_minimization"
     nn_params = NNParams()
     linear_model_hparams = LinearModelHparams()
@@ -626,11 +640,11 @@ if __name__ == "__main__":
     if FAST:
         nn_params.max_num_steps = 3
         nn_params.baseline_steps = 3
-        # training_mode = "gradient_step"
-        training_mode = "full_minimization"
-        exploration_hparams.decision_type = "simple"
+        # exploration_hparams.decision_type = "simple"
+        exploration_hparams.decision_type = "counterfactual"
+        # exploration_hparams.loss_confidence_band = 0
     # TODO
-    num_experiments = 1
+    num_experiments = 5
     logging_frequency = 1
     run_and_plot(
         dataset,

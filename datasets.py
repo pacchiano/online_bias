@@ -107,7 +107,7 @@ class MNISTDataset:
         self.symbol = symbol
         self.batch_size = batch_size
         self.dataset = datasets.MNIST(
-            "./MNIST/", train=train, download=False, transform=transform
+            "./", train=train, download=False, transform=transform
         )
         self.data_loader = torch.utils.data.DataLoader(
             self.dataset, batch_size=batch_size, shuffle=True

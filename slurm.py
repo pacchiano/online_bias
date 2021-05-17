@@ -15,8 +15,10 @@ from pytorch_experiments import (
 )
 
 PARALLEL = True
-FAST = False
-VERSION = 7
+FAST = True
+# FAST = False
+# VERSION = "_100t_fpr_norm_zero"
+VERSION = "ray_test"
 
 JOB_PREFIX = "fair_bandits_test"
 PARALLEL_STR = "_parallel" if PARALLEL else ""
@@ -64,23 +66,24 @@ def copy_and_run_with_config(
 
 
 def get_parallel_args():
-    datasets = ["MultiSVM", "Adult", "MNIST"] * 2
-    training_modes = (
-        ["full_minimization"] * len(datasets) + ["gradient_step"] * len(datasets)
-    )
+    datasets = ["MultiSVM", "Adult", "MNIST"]
+    training_modes = ["full_minimization"] * len(datasets)
     nn_params = NNParams()
-    nn_params_2 = NNParams()
-    nn_params_3 = NNParams()
-    nn_params_2.representation_layer_size = 40
-    nn_params_3.representation_layer_size = 100
-    nn_param_list = [nn_params, nn_params_2, nn_params_3] * 2
+    # Fairly fast, decent capacity.
+    # [10, 40, 100]
+    nn_params.representation_layer_size = 40
+    nn_param_list = [nn_params] * 3
     for nn_param in nn_param_list:
-        nn_param.max_num_steps = 200
-
-    linear_model_hparams = [LinearModelHparams()] * 6
-    exploration_hparams = [ExplorationHparams()] * 6
-    num_experiments = [5] * 6
-    logging_frequency = [10] * 6
+        # [30, 100, 200]
+        # nn_param.max_num_steps = 100
+        nn_param.max_num_steps = 30
+    linear_model_hparams = [LinearModelHparams()] * len(datasets)
+    exploration_hparams = [ExplorationHparams()] * len(datasets)
+    for eh in exploration_hparams:
+        eh.loss_confidence_band = 0
+    # TODO: work with Ray
+    num_experiments = [5] * len(datasets)
+    logging_frequency = [10] * len(datasets)
     return [
         datasets, training_modes, nn_param_list, linear_model_hparams,
         exploration_hparams, num_experiments, logging_frequency
@@ -94,7 +97,8 @@ def get_args():
     linear_model_hparams = LinearModelHparams()
     exploration_hparams = ExplorationHparams()
     logging_frequency = 10
-    num_experiments = 5
+    # TODO: work with Ray
+    num_experiments = 1
 
     if FAST:
         nn_params.max_num_steps = 2
@@ -119,7 +123,8 @@ def get_args():
 working_directory = "/checkpoint/apacchiano/"
 partition = "learnfair"
 gpus_per_node = 1
-ntasks_per_node = 1
+# ntasks_per_node = 1
+ntasks_per_node = 5
 nodes = 1
 
 
@@ -140,7 +145,7 @@ copy_and_run_with_config(
     partition=partition,
     gpus_per_node=gpus_per_node,
     ntasks_per_node=ntasks_per_node,
-    cpus_per_task=10,
+    cpus_per_task=1,
     # mem="470GB",
     mem="40GB",
     nodes=nodes,
