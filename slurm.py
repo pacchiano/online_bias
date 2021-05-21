@@ -15,10 +15,9 @@ from pytorch_experiments import (
 )
 
 PARALLEL = True
-FAST = True
-# FAST = False
-# VERSION = "_100t_fpr_norm_zero"
-VERSION = "ray_test"
+# FAST = True
+FAST = False
+VERSION = "_1000t_pseudolabel_v2"
 
 JOB_PREFIX = "fair_bandits_test"
 PARALLEL_STR = "_parallel" if PARALLEL else ""
@@ -74,14 +73,13 @@ def get_parallel_args():
     nn_params.representation_layer_size = 40
     nn_param_list = [nn_params] * 3
     for nn_param in nn_param_list:
-        # [30, 100, 200]
-        # nn_param.max_num_steps = 100
-        nn_param.max_num_steps = 30
+        # [30, 100, 1000]
+        nn_param.max_num_steps = 1000
     linear_model_hparams = [LinearModelHparams()] * len(datasets)
     exploration_hparams = [ExplorationHparams()] * len(datasets)
-    for eh in exploration_hparams:
-        eh.loss_confidence_band = 0
     # TODO: work with Ray
+    # for eh in exploration_hparams:
+    #     eh.loss_confidence_band = 0
     num_experiments = [5] * len(datasets)
     logging_frequency = [10] * len(datasets)
     return [
@@ -90,50 +88,15 @@ def get_parallel_args():
     ]
 
 
-def get_args():
-    dataset = "MultiSVM"
-    nn_params = NNParams()
-    nn_params.max_num_steps = 200
-    linear_model_hparams = LinearModelHparams()
-    exploration_hparams = ExplorationHparams()
-    logging_frequency = 10
-    # TODO: work with Ray
-    num_experiments = 1
-
-    if FAST:
-        nn_params.max_num_steps = 2
-        nn_params.baseline_steps = 10
-        training_mode = "gradient_step"
-        exploration_hparams.decision_type = "simple"
-    return {
-        "dataset": dataset,
-        "training_mode": training_mode,
-        "nn_params": nn_params,
-        "linear_model_hparams": linear_model_hparams,
-        "exploration_hparams": exploration_hparams,
-        "logging_frequency": logging_frequency,
-        "num_experiments": num_experiments,
-    }
-    # return [
-    #     dataset, training_mode, nn_params, linear_model_hparams,
-    #     exploration_hparams, logging_frequency, num_experiments
-    # ]
-
-
 working_directory = "/checkpoint/apacchiano/"
 partition = "learnfair"
 gpus_per_node = 1
-# ntasks_per_node = 1
-ntasks_per_node = 5
+ntasks_per_node = 1
+# ntasks_per_node = 5
 nodes = 1
 
 
-cluster_config = {
-    "num_gpus": 2,
-    "array_parallelism": 20,
-}
-
-args = get_parallel_args() if PARALLEL else get_args()
+args = get_parallel_args()
 copy_and_run_with_config(
     run_and_plot,
     args,

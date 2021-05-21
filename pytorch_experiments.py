@@ -11,15 +11,15 @@ from experiment_regret import run_regret_experiment_pytorch
 from typing import Any
 
 
-USE_RAY = True
-# USE_RAY = False
+# USE_RAY = True
+USE_RAY = False
 
 LINEWIDTH = 3.5
 LINESTYLE = "dashed"
 STD_GAP = 0.5
 ALPHA = 0.1
-# FAST = True
-FAST = False
+FAST = True
+# FAST = False
 
 
 @dataclass
@@ -560,7 +560,8 @@ def run_and_plot(
     num_experiments,
 ):
     # TODO?
-    ray.init()
+    if USE_RAY:
+        ray.init()
     start_time = time.time()
     linear = False
     network_type, base_figs_directory, base_data_directory = configure_directories(
@@ -644,7 +645,7 @@ if __name__ == "__main__":
         exploration_hparams.decision_type = "counterfactual"
         # exploration_hparams.loss_confidence_band = 0
     # TODO
-    num_experiments = 5
+    num_experiments = 1
     logging_frequency = 1
     run_and_plot(
         dataset,
