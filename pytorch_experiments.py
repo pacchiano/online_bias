@@ -639,8 +639,9 @@ if __name__ == "__main__":
     linear_model_hparams = LinearModelHparams()
     exploration_hparams = ExplorationHparams()
     if FAST:
-        nn_params.max_num_steps = 3
+        nn_params.max_num_steps = 2
         nn_params.baseline_steps = 3
+        nn_params.batch_size = 1
         # exploration_hparams.decision_type = "simple"
         exploration_hparams.decision_type = "counterfactual"
         # exploration_hparams.loss_confidence_band = 0

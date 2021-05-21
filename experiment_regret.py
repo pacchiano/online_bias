@@ -605,33 +605,44 @@ def run_regret_experiment_pytorch(
         biased_train_accuracy = 0
         batch_regret = 0
 
-        for i in range(len(global_biased_prediction)):
-            accept_point = global_biased_prediction[
-                i
-            ] > linear_model_hparams.biased_threshold or (
-                exploration_hparams.epsilon_greedy
-                and np.random.random() < exploration_hparams.epsilon
+        print(type(global_biased_prediction))
+        # if len(global_biased_prediction) == 1:
+        if type(global_biased_prediction) == torch.Tensor:
+            # label = batch_y.item()
+            print(batch_y)
+            label = batch_y[0]
+            accuracy, regret, accepted = process_prediction(
+                global_biased_prediction.item(), label, linear_model_hparams,
+                exploration_hparams, regret_wrt_baseline, baseline_accuracy
             )
-
-            biased_train_accuracy += (accept_point == batch_y[i]) * 1.0
-            if regret_wrt_baseline:
-                batch_regret += baseline_accuracy - (accept_point == batch_y[i]) * 1.0
-
-            else:
-                if accept_point and batch_y[i] == 0:
-                    batch_regret += 1
-                elif not accept_point and batch_y[i] == 1:
-                    batch_regret += 1.0
-
-            if accept_point:
-                biased_batch_X.append(batch_X[i])
-                biased_batch_y.append(batch_y[i])
+            biased_train_accuracy += accuracy
+            batch_regret += regret
+            if accepted:
+                biased_batch_X.append(batch_X[0])
+                biased_batch_y.append(label)
                 biased_batch_size += 1
+        else:
+            for i in range(len(global_biased_prediction)):
+                label = batch_y[i]
+                accuracy, regret, accepted = process_prediction(
+                    global_biased_prediction[i], label, linear_model_hparams,
+                    exploration_hparams, regret_wrt_baseline, baseline_accuracy
+                )
+                biased_train_accuracy += accuracy
+                batch_regret += regret
+                if accepted:
+                    biased_batch_X.append(batch_X[i])
+                    biased_batch_y.append(label)
+                    biased_batch_size += 1
         biased_batch_X = np.array(biased_batch_X)
         biased_batch_y = np.array(biased_batch_y)
 
-        biased_train_accuracy = biased_train_accuracy / len(global_biased_prediction)
-        batch_regret = batch_regret / len(global_biased_prediction) * 1.0
+        try:
+            size = len(global_biased_prediction)
+        except TypeError:
+            size = 1
+        biased_train_accuracy = biased_train_accuracy / size
+        batch_regret = batch_regret / size * 1.0
 
         biased_data_totals += biased_batch_size
 
@@ -789,3 +800,28 @@ def run_regret_experiment_pytorch(
         baseline_accuracy,
         error_breakdown_list,
     )
+
+
+def process_prediction(
+    global_biased_prediction, label,
+    linear_model_hparams, exploration_hparams,
+    regret_wrt_baseline, baseline_accuracy
+):
+    accept_point = global_biased_prediction > linear_model_hparams.biased_threshold or (
+        exploration_hparams.epsilon_greedy
+        and np.random.random() < exploration_hparams.epsilon
+    )
+
+    # biased_train_accuracy += (accept_point == batch_y[i]) * 1.0
+    if regret_wrt_baseline:
+        # batch_regret += baseline_accuracy - (accept_point == batch_y[i]) * 1.0
+        regret = baseline_accuracy - (accept_point == label) * 1.0
+    else:
+        if accept_point and label == 0:
+            regret = 1
+        elif not accept_point and label == 1:
+            regret = 1.0
+
+    # return biased_train_accuracy += (accept_point == label) * 1.0
+    accuracy = (accept_point == label) * 1.0
+    return accuracy, regret, accept_point

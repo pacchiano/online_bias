@@ -17,7 +17,7 @@ from pytorch_experiments import (
 PARALLEL = True
 # FAST = True
 FAST = False
-VERSION = "_1000t_pseudolabel_v2"
+VERSION = "_30t_pseudolabel_single_point"
 
 JOB_PREFIX = "fair_bandits_test"
 PARALLEL_STR = "_parallel" if PARALLEL else ""
@@ -74,13 +74,15 @@ def get_parallel_args():
     nn_param_list = [nn_params] * 3
     for nn_param in nn_param_list:
         # [30, 100, 1000]
-        nn_param.max_num_steps = 1000
+        nn_param.max_num_steps = 30
+        # TODO
+        nn_param.batch_size = 1
     linear_model_hparams = [LinearModelHparams()] * len(datasets)
     exploration_hparams = [ExplorationHparams()] * len(datasets)
     # TODO: work with Ray
     # for eh in exploration_hparams:
     #     eh.loss_confidence_band = 0
-    num_experiments = [5] * len(datasets)
+    num_experiments = [1] * len(datasets)
     logging_frequency = [10] * len(datasets)
     return [
         datasets, training_modes, nn_param_list, linear_model_hparams,
