@@ -15,10 +15,14 @@ from pytorch_experiments import (
 )
 
 PARALLEL = True
-FAST = True
-VERSION = "fast_ray"
-# FAST = False
-# VERSION = "_100t_pseudolabel_single_pt_no_warmstart"
+# FAST = True
+# VERSION = "fast_ray_distr"
+FAST = False
+T = 300
+BATCH = 32
+EPS_GREEDY = True
+method = "pseudolabel_" if not EPS_GREEDY else "eps_greedy_"
+VERSION = f"_{T}t_{method}ray_no_warm_batch_{BATCH}"
 
 JOB_PREFIX = "fair_bandits_test"
 PARALLEL_STR = "_parallel" if PARALLEL else ""
@@ -76,21 +80,24 @@ def get_parallel_args():
     for nn_param in nn_param_list:
         # [30, 100, 1000]
         if FAST:
-            nn_params.max_num_steps = 2
-            nn_params.baseline_steps = 3
-            nn_params.batch_size = 1
-        else:
-            nn_param.max_num_steps = 100
-            # TODO
+            nn_param.max_num_steps = 5
+            nn_param.baseline_steps = 1000
             nn_param.batch_size = 1
+        else:
+            nn_param.max_num_steps = T
+            # TODO
+            nn_param.batch_size = BATCH
             nn_param.weight_decay = 0.005
     linear_model_hparams = [LinearModelHparams()] * len(datasets)
-    exploration_hparams = [ExplorationHparams()] * len(datasets)
-    # TODO: work with Ray
+    exploration_hparam = ExplorationHparams()
+    if EPS_GREEDY:
+        exploration_hparam.decision_type = "simple"
+        exploration_hparam.epsilon_greedy = True
+    exploration_hparams = [exploration_hparam] * len(datasets)
     # for eh in exploration_hparams:
     #     eh.loss_confidence_band = 0
     num_experiments = [5] * len(datasets)
-    logging_frequency = [1] * len(datasets)
+    logging_frequency = [5] * len(datasets)
     return [
         datasets, training_modes, nn_param_list, linear_model_hparams,
         exploration_hparams, num_experiments, logging_frequency
@@ -102,7 +109,7 @@ partition = "learnfair"
 gpus_per_node = 1
 ntasks_per_node = 1
 # ntasks_per_node = 5
-nodes = 1
+nodes = 3
 
 
 args = get_parallel_args()
@@ -117,7 +124,7 @@ copy_and_run_with_config(
     partition=partition,
     gpus_per_node=gpus_per_node,
     ntasks_per_node=ntasks_per_node,
-    cpus_per_task=1,
+    cpus_per_task=5,
     # mem="470GB",
     mem="40GB",
     nodes=nodes,

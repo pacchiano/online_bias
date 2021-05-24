@@ -647,11 +647,12 @@ if __name__ == "__main__":
     nn_params = NNParams()
     nn_params.max_num_steps = 2
     nn_params.baseline_steps = 3
-    nn_params.batch_size = 1
+    nn_params.batch_size = 10
     linear_model_hparams = LinearModelHparams()
     exploration_hparams = ExplorationHparams()
-    # exploration_hparams.decision_type = "simple"
-    exploration_hparams.decision_type = "counterfactual"
+    exploration_hparams.decision_type = "simple"
+    exploration_hparams.epsilon_greedy = True
+    # exploration_hparams.decision_type = "counterfactual"
     # exploration_hparams.loss_confidence_band = 0
     # TODO
     num_experiments = 3

@@ -616,11 +616,11 @@ def run_regret_experiment_pytorch(
         biased_train_accuracy = 0
         batch_regret = 0
 
-        print(type(global_biased_prediction))
+        # print(type(global_biased_prediction))
         # if len(global_biased_prediction) == 1:
-        if type(global_biased_prediction) == torch.Tensor:
+        if type(global_biased_prediction) == torch.Tensor and global_biased_prediction.size()[0] == 1:
             # label = batch_y.item()
-            print(batch_y)
+            # print(batch_y)
             label = batch_y[0]
             accuracy, regret, accepted = process_prediction(
                 global_biased_prediction.item(), label, linear_model_hparams,
