@@ -23,7 +23,6 @@ BATCH = 32
 EPS_GREEDY = True
 method = "pseudolabel_" if not EPS_GREEDY else "eps_greedy_"
 VERSION = f"_{T}t_{method}ray_no_warm_batch_{BATCH}"
-
 JOB_PREFIX = "fair_bandits_test"
 PARALLEL_STR = "_parallel" if PARALLEL else ""
 JOB_NAME = f"{JOB_PREFIX}{PARALLEL_STR}_{VERSION}"
