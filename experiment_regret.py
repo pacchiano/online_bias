@@ -16,10 +16,6 @@ from models import (
 )
 
 
-NEW_METHOD = True
-
-
-# TODO: why fixed steps?
 def train_model(
     model,
     num_steps,
@@ -27,18 +23,18 @@ def train_model(
     batch_size,
     verbose=False,
     restart_model_full_minimization=True,
+    weight_decay=0.0
 ):
     for i in range(num_steps):
         if verbose:
             print("train model iteration ", i)
         batch_X, batch_y = train_dataset.get_batch(batch_size)
-
         if i == 0:
             if restart_model_full_minimization:
                 model.initialize_model(batch_X.shape[1])
-            # model.initialize_model(batch_X)
-            # TODO: extract nn learning rate?
-            optimizer = torch.optim.Adam(model.network.parameters(), lr=0.01)
+            optimizer = torch.optim.Adam(
+                model.network.parameters(), lr=0.01, weight_decay=weight_decay
+            )
 
         optimizer.zero_grad()
         loss = model.get_loss(batch_X, batch_y)
@@ -58,6 +54,7 @@ def train_model_with_stopping(
     eps=0.0001,
     max_epochs=7,
     eps_epoch_cycle=30,
+    weight_decay=0.0
 ):
     curr_epoch_size = min_epoch_size
     prev_loss_value = float("inf")
@@ -87,6 +84,7 @@ def train_model_with_stopping(
             batch_size,
             verbose=False,
             restart_model_full_minimization=False,
+            weight_decay=weight_decay
         )
         train_batch = train_dataset.get_batch(1000)
         with torch.no_grad():
@@ -340,11 +338,11 @@ def run_regret_experiment_pytorch(
     logging_frequency,
 ):
     # TODO: remove/pull up into hparams
-    regret_wrt_baseline = True
     MLP = True
-    num_full_minimization_steps = nn_params.num_full_minimization_steps
     verbose = False
-    restart_model_full_minimization = True
+    regret_wrt_baseline = exploration_hparams.regret_wrt_baseline
+    num_full_minimization_steps = nn_params.num_full_minimization_steps
+    restart_model_full_minimization = nn_params.restart_model_full_minimization
     estimate_loss_confidence_band = True
 
     (
@@ -473,7 +471,7 @@ def run_regret_experiment_pytorch(
                 unbiased_dataset,
                 nn_params.batch_size,
                 verbose=verbose,
-                restart_model_full_minimization=restart_model_full_minimization,
+                restart_model_full_minimization=nn_params.restart_model_full_minimization,
                 eps=0.0001 * np.log(counter + 2) / 2,
             )
             gc.collect()
@@ -505,7 +503,7 @@ def run_regret_experiment_pytorch(
                 global_biased_prediction = [1 for _ in range(nn_params.batch_size)]
             # Evaluate the loss over the existing dataset.
             else:
-                if NEW_METHOD:
+                if nn_params.pseudolabel:
                     # print("EVALUATING PSEUDO-LABEL")
                     # Add psuedo label and train.
                     pseudo_Y = np.ones(batch_X.shape[0])
@@ -513,10 +511,23 @@ def run_regret_experiment_pytorch(
                     # print(f"Pseudo label shape: {pseudo_Y.shape}")
                     # print(f"Batch X shape: {batch_X.shape}")
                     biased_dataset.add_data(batch_X, pseudo_Y)
-                    model_biased_prediction = train_model(
-                        model_biased_prediction, num_full_minimization_steps,
-                        biased_dataset, nn_params.batch_size
+                    # TODO
+                    model_biased_prediction = train_model_with_stopping(
+                        model_biased_prediction,
+                        num_full_minimization_steps,
+                        biased_dataset,
+                        nn_params.batch_size,
+                        verbose=verbose,
+                        restart_model_full_minimization=nn_params.restart_model_full_minimization,
+                        eps=0.0001 * np.log(counter + 2) / 2,
+                        weight_decay=nn_params.weight_decay
                     )
+                    # model_biased_prediction = train_model(
+                    #     model_biased_prediction, num_full_minimization_steps,
+                    #     biased_dataset, nn_params.batch_size,
+                    #     restart_model_full_minimization=nn_params.restart_model_full_minimization,
+                    #     weight_decay=nn_params.weight_decay
+                    # )
                     biased_dataset.pop_last_data()
                     global_biased_prediction, _ = get_predictions(
                         global_batch, protected_batches, model_biased_prediction

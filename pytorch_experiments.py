@@ -11,26 +11,28 @@ from experiment_regret import run_regret_experiment_pytorch
 from typing import Any
 
 
-# USE_RAY = True
-USE_RAY = False
+USE_RAY = True
+# USE_RAY = False
 
 LINEWIDTH = 3.5
 LINESTYLE = "dashed"
 STD_GAP = 0.5
 ALPHA = 0.1
-FAST = True
-# FAST = False
 
 
 @dataclass
 class NNParams:
-    # representation_layer_sizes = [10, 40, 100]
-    representation_layer_size = 10
-    max_num_steps = 200
+    representation_layer_size = 40
+    max_num_steps = 100
     baseline_steps = 10000
-    batch_size = 32
-    num_full_minimization_steps = 200
+    # batch_size = 32
+    batch_size = 1
+    # num_full_minimization_steps = 200
+    num_full_minimization_steps = 100
     random_init = True
+    restart_model_full_minimization = True
+    weight_decay = 0.0
+    pseudolabel = True
 
 
 @dataclass
@@ -57,6 +59,7 @@ class ExplorationHparams:
     epsilon_greedy = False
     adjust_mahalanobis = False
     loss_confidence_band = None
+    regret_wrt_baseline = True
 
 
 @dataclass
@@ -134,11 +137,17 @@ def configure_directories(dataset, nn_params, linear):
     network_type = (
         "Linear{}".format(nn_params.representation_layer_size) if linear else "MLP"
     )
-    base_data_directory = "{}/experiment_results/T{}/{}/{}/data".format(
-        path, nn_params.max_num_steps, network_type, dataset
+    # base_data_directory = "{}/experiment_results/{}/{}/{}/data".format(
+    #     path, nn_params.max_num_steps, network_type, dataset
+    # )
+    # base_figs_directory = "{}/experiment_results/T{}/{}/{}/figs".format(
+    #     path, nn_params.max_num_steps, network_type, dataset
+    # )
+    base_data_directory = "{}/experiment_results/{}/data".format(
+        path, dataset
     )
-    base_figs_directory = "{}/experiment_results/T{}/{}/{}/figs".format(
-        path, nn_params.max_num_steps, network_type, dataset
+    base_figs_directory = "{}/experiment_results/{}/figs".format(
+        path, dataset
     )
 
     if not os.path.isdir(base_data_directory):
@@ -636,17 +645,16 @@ if __name__ == "__main__":
     dataset = "MNIST"
     training_mode = "full_minimization"
     nn_params = NNParams()
+    nn_params.max_num_steps = 2
+    nn_params.baseline_steps = 3
+    nn_params.batch_size = 1
     linear_model_hparams = LinearModelHparams()
     exploration_hparams = ExplorationHparams()
-    if FAST:
-        nn_params.max_num_steps = 2
-        nn_params.baseline_steps = 3
-        nn_params.batch_size = 1
-        # exploration_hparams.decision_type = "simple"
-        exploration_hparams.decision_type = "counterfactual"
-        # exploration_hparams.loss_confidence_band = 0
+    # exploration_hparams.decision_type = "simple"
+    exploration_hparams.decision_type = "counterfactual"
+    # exploration_hparams.loss_confidence_band = 0
     # TODO
-    num_experiments = 1
+    num_experiments = 3
     logging_frequency = 1
     run_and_plot(
         dataset,
