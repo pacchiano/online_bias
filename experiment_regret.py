@@ -38,9 +38,9 @@ def train_model(
                 model.network.parameters(), lr=0.01, weight_decay=weight_decay
             )
 
-        # print("getting loss")
-        # print(type(batch_X))
-        # print(batch_X)
+        print("getting loss")
+        print(type(batch_X))
+        print(batch_X)
         optimizer.zero_grad()
         loss = model.get_loss(batch_X, batch_y)
 
