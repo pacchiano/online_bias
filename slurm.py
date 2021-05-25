@@ -18,11 +18,12 @@ PARALLEL = True
 # FAST = True
 # VERSION = "fast_ray_distr"
 FAST = False
-T = 300
+T = 4
 BATCH = 32
-EPS_GREEDY = True
-method = "pseudolabel_" if not EPS_GREEDY else "eps_greedy_"
-VERSION = f"_{T}t_{method}ray_no_warm_batch_{BATCH}"
+EPS_GREEDY = False
+METHOD = "pseudolabel_" if not EPS_GREEDY else "eps_greedy_"
+DECAY = 0.1
+VERSION = f"_{T}t_{METHOD}ray_no_warm_batch_{BATCH}_decay_{DECAY}"
 JOB_PREFIX = "fair_bandits_test"
 PARALLEL_STR = "_parallel" if PARALLEL else ""
 JOB_NAME = f"{JOB_PREFIX}{PARALLEL_STR}_{VERSION}"
@@ -86,7 +87,7 @@ def get_parallel_args():
             nn_param.max_num_steps = T
             # TODO
             nn_param.batch_size = BATCH
-            nn_param.weight_decay = 0.005
+            nn_param.weight_decay = DECAY
     linear_model_hparams = [LinearModelHparams()] * len(datasets)
     exploration_hparam = ExplorationHparams()
     if EPS_GREEDY:
@@ -104,7 +105,7 @@ def get_parallel_args():
 
 
 working_directory = "/checkpoint/apacchiano/"
-partition = "learnfair"
+partition = "prioritylab"
 gpus_per_node = 1
 ntasks_per_node = 1
 # ntasks_per_node = 5
@@ -120,12 +121,13 @@ copy_and_run_with_config(
     array_parallelism=20,
     job_name=JOB_NAME,
     time="72:00:00",
+    comment="Neurips Deadline",
     partition=partition,
     gpus_per_node=gpus_per_node,
     ntasks_per_node=ntasks_per_node,
     cpus_per_task=5,
     # mem="470GB",
-    mem="40GB",
+    mem="100GB",
     nodes=nodes,
     # constraint="volta32gb",
 )

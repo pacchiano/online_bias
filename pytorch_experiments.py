@@ -109,7 +109,8 @@ def run_experiment_parallel(
         loss_validation_biased,
         loss_baseline,
         baseline_accuracy,
-        error_breakdown
+        train_error_breakdown,
+        test_error_breakdown
     ) = run_regret_experiment_pytorch(
         dataset,
         training_mode,
@@ -128,7 +129,8 @@ def run_experiment_parallel(
         loss_validation_biased,
         loss_baseline,
         baseline_accuracy,
-        error_breakdown
+        train_error_breakdown,
+        test_error_breakdown
     )
 
 
@@ -650,12 +652,12 @@ if __name__ == "__main__":
     nn_params.batch_size = 10
     linear_model_hparams = LinearModelHparams()
     exploration_hparams = ExplorationHparams()
-    exploration_hparams.decision_type = "simple"
-    exploration_hparams.epsilon_greedy = True
-    # exploration_hparams.decision_type = "counterfactual"
+    # exploration_hparams.decision_type = "simple"
+    # exploration_hparams.epsilon_greedy = True
+    exploration_hparams.decision_type = "counterfactual"
     # exploration_hparams.loss_confidence_band = 0
     # TODO
-    num_experiments = 3
+    num_experiments = 2
     logging_frequency = 1
     run_and_plot(
         dataset,
