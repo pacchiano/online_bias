@@ -19,11 +19,19 @@ PARALLEL = True
 # FAST = True
 # VERSION = "fast_ray_distr"
 FAST = False
-T = 30
-BATCH = 1
+T = 100
+BATCH = 32
 EPS_GREEDY = False
-METHOD = "pseudolabel_" if not EPS_GREEDY else "eps_greedy_"
-DECAY = 0.001
+GREEDY = True
+
+if EPS_GREEDY:
+    METHOD = "eps_greedy_"
+elif GREEDY:
+    METHOD = "greedy_"
+else:
+    METHOD = "pseudolabel_"
+# DECAY = 0.001
+DECAY = 0.0
 VERSION = f"_{T}t_{METHOD}ray_no_warm_batch_{BATCH}_decay_{DECAY}_gpu"
 JOB_PREFIX = "fair_bandits_test"
 PARALLEL_STR = "_parallel" if PARALLEL else ""
@@ -87,6 +95,9 @@ def get_parallel_args():
     if EPS_GREEDY:
         exploration_hparam.decision_type = "simple"
         exploration_hparam.epsilon_greedy = True
+    elif GREEDY:
+        exploration_hparam.decision_type = "simple"
+        exploration_hparam.epsilon_greedy = False
     exploration_hparams = [exploration_hparam] * len(datasets)
     # for eh in exploration_hparams:
     #     eh.loss_confidence_band = 0

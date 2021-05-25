@@ -11,18 +11,20 @@ with open("fnr_dump.p", 'rb') as f:
 #print("FPR + Norm")
 #print(x[-1])
 
-# print(len(x[0]))
-exp = x[-1]
-# print(exp)
-print("FPR")
-print([y.fpr for y in exp])
-print("FnR")
-print([y.fnr for y in exp])
-print("Weight Norm")
-print([y.weight_norm for y in exp])
-# for l in x:
-#     for y in l:
-#         print(y.weight_norm)
-#
+train = x[0]
+for exp in train:
+    print("Train FPR")
+    print([y.fpr for y in exp])
+    print("FnR")
+    print([y.fnr for y in exp])
+    print("Weight Norm")
+    print([y.weight_norm for y in exp])
 
-
+test = x[1]
+for exp in test:
+    print("Test FPR")
+    print([y.fpr for y in exp])
+    print("FnR")
+    print([y.fnr for y in exp])
+    print("Weight Norm")
+    print([y.weight_norm for y in exp])
