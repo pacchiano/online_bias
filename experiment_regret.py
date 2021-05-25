@@ -1,7 +1,3 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import numpy as np
 import gc
 import torch
@@ -28,14 +24,23 @@ def train_model(
     for i in range(num_steps):
         if verbose:
             print("train model iteration ", i)
+        # print(train_dataset)
         batch_X, batch_y = train_dataset.get_batch(batch_size)
         if i == 0:
             if restart_model_full_minimization:
+                # print("Batch X: ")
+                # print(batch_X.shape)
+                # model.initialize_model(batch_X.shape[1])
+                if len(batch_X.shape) == 1:
+                    batch_X = np.expand_dims(batch_X, axis=1)
                 model.initialize_model(batch_X.shape[1])
             optimizer = torch.optim.Adam(
                 model.network.parameters(), lr=0.01, weight_decay=weight_decay
             )
 
+        # print("getting loss")
+        # print(type(batch_X))
+        # print(batch_X)
         optimizer.zero_grad()
         loss = model.get_loss(batch_X, batch_y)
 
@@ -316,7 +321,10 @@ def compute_loss_confidence_band(
         loss_values.sort()
         loss_values = loss_values[0: int(len(loss_values) / 2)]
 
-    return np.std(loss_values), np.mean(loss_values)
+    # return np.std(loss_values), np.mean(loss_values)
+    loss_values = torch.stack(loss_values)
+    # print(f"Loss values: {loss_values}")
+    return np.std(loss_values.cpu().numpy()), np.mean(loss_values.cpu().numpy())
 
 
 def gradient_step(model, optimizer, batch_X, batch_y):
@@ -397,7 +405,8 @@ def run_regret_experiment_pytorch(
 
     accuracies_list = []
     biased_accuracies_list = []
-    error_breakdown_list = []
+    train_error_breakdown_list = []
+    test_error_breakdown_list = []
     loss_validation = []
     loss_validation_biased = []
     train_regret = []
@@ -419,7 +428,7 @@ def run_regret_experiment_pytorch(
         MLP=MLP,
         representation_layer_size=nn_params.representation_layer_size,
     )
-
+    model_biased_prediction = None
     if exploration_hparams.decision_type == "counterfactual":
         model_biased_prediction = TorchBinaryLogisticRegression(
             random_init=nn_params.random_init,
@@ -501,7 +510,6 @@ def run_regret_experiment_pytorch(
             if biased_dataset.get_size() == 0:
                 # ACCEPT ALL POINTS IF THE BIASED DATASET IS NOT INITIALIZED
                 global_biased_prediction = [1 for _ in range(nn_params.batch_size)]
-            # Evaluate the loss over the existing dataset.
             else:
                 if nn_params.pseudolabel:
                     # print("EVALUATING PSEUDO-LABEL")
@@ -536,6 +544,7 @@ def run_regret_experiment_pytorch(
                     # EVALUATE THE EXPECTED LOSS
                     with torch.no_grad():
                         all_data_X, all_data_Y = biased_dataset.get_batch(10000000000)
+                        # Evaluate the loss over the existing dataset.
                         loss_initial = model_biased.get_loss(all_data_X, all_data_Y)
 
                     if exploration_hparams.loss_confidence_band is not None:
@@ -618,6 +627,7 @@ def run_regret_experiment_pytorch(
 
         # print(type(global_biased_prediction))
         # if len(global_biased_prediction) == 1:
+        # FIX fix fix
         if type(global_biased_prediction) == torch.Tensor and global_biased_prediction.size()[0] == 1:
             # label = batch_y.item()
             # print(batch_y)
@@ -665,6 +675,7 @@ def run_regret_experiment_pytorch(
                 #     model_biased, num_full_minimization_steps, biased_dataset,
                 # batch_size, restart_model_full_minimization =
                 # restart_model_full_minimization)
+                print(f"Biased dataset: {biased_dataset}")
                 model_biased = train_model_with_stopping(
                     model_biased,
                     num_full_minimization_steps,
@@ -742,12 +753,19 @@ def run_regret_experiment_pytorch(
                 linear_model_hparams.threshold,
             )
             biased_accuracies_list.append(biased_total_accuracy)
-            breakdown = get_error_breakdown(
-                global_batch_test,
-                model_biased,
-                linear_model_hparams.threshold,
-            )
-            error_breakdown_list.append(breakdown)
+            if model_biased_prediction is not None:
+                train_breakdown = get_error_breakdown(
+                    global_batch,
+                    model_biased_prediction,
+                    linear_model_hparams.threshold,
+                )
+                test_breakdown = get_error_breakdown(
+                    global_batch_test,
+                    model_biased_prediction,
+                    linear_model_hparams.threshold,
+                )
+                train_error_breakdown_list.append(train_breakdown)
+                test_error_breakdown_list.append(test_breakdown)
             # Compute training biased accuracy
             # TODO: this errors sometimes! is this too big?
             # TODO: dataset_X is a list, not numpy.
@@ -809,7 +827,8 @@ def run_regret_experiment_pytorch(
         loss_validation_biased,
         loss_validation_baseline,
         baseline_accuracy,
-        error_breakdown_list,
+        train_error_breakdown_list,
+        test_error_breakdown_list,
     )
 
 
