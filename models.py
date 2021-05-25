@@ -20,18 +20,18 @@ class Feedforward(torch.nn.Module):
         self.sigmoid = torch.nn.Sigmoid()
 
         if self.MLP:
-
-            # self.input_size = input_size
             self.hidden_size = hidden_size
-            self.fc1 = torch.nn.Linear(self.input_size, self.hidden_size)
-            self.relu = torch.nn.ReLU()
-            self.fc2 = torch.nn.Linear(self.hidden_size, 1)
-            # self.sigmoid = torch.nn.Sigmoid()
+            # TODO?
+            self.fc1 = torch.nn.Linear(self.input_size, self.hidden_size).to('cuda')
+            self.relu = torch.nn.ReLU().to('cuda')
+            self.fc2 = torch.nn.Linear(self.hidden_size, 1).to('cuda')
 
         else:
-            self.fc1 = torch.nn.Linear(self.input_size, 1, bias=False)
+            self.fc1 = torch.nn.Linear(self.input_size, 1, bias=False).to('cuda')
 
     def forward(self, x, inverse_data_covariance=[], alpha=0):
+        # TODO
+        x = x.to('cuda')
         if self.MLP:
             hidden = self.fc1(x)
             representation = self.relu(hidden)
@@ -114,9 +114,15 @@ class TorchBinaryLogisticRegression:
         # self.initialize_gaussian()
 
     def __add_intercept(self, batch_X):
-
-        intercept = np.ones((batch_X.shape[0], 1))
-        return np.concatenate((batch_X, intercept), axis=1)
+        # TODO
+        # try:
+        #     batch_X = batch_X.cpu()
+        # except AttributeError:
+        #     pass
+        # intercept = np.ones((batch_X.shape[0], 1))
+        # return np.concatenate((batch_X, intercept), axis=1)
+        intercept = torch.ones(batch_X.shape[0], 1).to('cuda')
+        return torch.cat((batch_X, intercept), dim=1)
 
     def __sigmoid(self, z):
         return 1 / (1 + torch.exp(-z))
@@ -149,14 +155,28 @@ class TorchBinaryLogisticRegression:
         # if len(batch_y) == 1:
         #   IPython.embed()
         #   raise ValueError("asdflkm")
+        # print("about to update batch")
         batch_X = self.__update_batch(batch_X)
-        batch_X = torch.from_numpy(batch_X)
-        batch_y = torch.from_numpy(batch_y)
+        # TODO
+        # print(type(batch_X))
+        # print(batch_X.astype(np.float64))
+        # try:
+        #     batch_X = torch.from_numpy(batch_X).to('cuda')
+        # except TypeError:
+        #     try:
+        #         batch_X = torch.from_numpy(batch_X.astype(np.float64)).to('cuda')
+        #     except ValueError:
+        #         pass
+        # batch_y = torch.from_numpy(batch_y)
         # import IPython
         # IPython.embed()
         # raise ValueError("Asdflkm")
         # if self.MLP:
         # prob_predictions, representations =  self.network(batch_X.float())#.squeeze()
+        self.network.to('cuda')
+        # TODO: get np object to float64.
+        # print(type(batch_X))
+        # print(batch_X.shape)
         prob_predictions, _ = self.network(batch_X.float())  # .squeeze()
 
         # import IPython
@@ -180,8 +200,7 @@ class TorchBinaryLogisticRegression:
     def predict_prob(self, batch_X, inverse_data_covariance=[]):
         # self.__initialize_theta(batch_X)
         batch_X = self.__update_batch(batch_X)
-        batch_X = torch.from_numpy(batch_X)
-
+        # batch_X = torch.from_numpy(batch_X)
         # if self.MLP:
         # prob_predictions, representations =  self.network(batch_X.float())#.squeeze()
         # if len(inverse_data_covariance) == 0:
@@ -209,17 +228,21 @@ class TorchBinaryLogisticRegression:
         #   prob_predictions =  self.network(batch_X.float())
         # else:
         prob_predictions = self.predict_prob(batch_X, inverse_data_covariance)
-
         thresholded_predictions = prob_predictions > threshold
-        thresholded_predictions = torch.squeeze(thresholded_predictions)
-        thresholded_predictions = thresholded_predictions.numpy()
+        # TODO: needed?
+        # thresholded_predictions = torch.squeeze(thresholded_predictions)
+        # thresholded_predictions = thresholded_predictions.cpu().numpy()
         return thresholded_predictions
 
     def get_accuracy(self, batch_X, batch_y, threshold, inverse_data_covariance=[]):
         thresholded_predictions = self.get_predictions(
             batch_X, threshold, inverse_data_covariance
         )
+        # boolean_predictions = thresholded_predictions == batch_y.cpu().numpy()
         boolean_predictions = thresholded_predictions == batch_y
+        # print(f"Batch_y: {batch_y.shape}")
+        # print(f"Thresh Predictions: {thresholded_predictions.shape}")
+        # print(f"Boolean Predictions: {boolean_predictions}")
         return (boolean_predictions * 1.0).mean()
 
     def get_breakdown(self, batch_X, batch_y, threshold, inverse_data_covariance=[]):
@@ -227,8 +250,8 @@ class TorchBinaryLogisticRegression:
             batch_X, threshold, inverse_data_covariance
         )
         # False Positive
-        false_positive = np.bitwise_and(thresholded_predictions == 1, batch_y == 0)
-        false_negative = np.bitwise_and(thresholded_predictions == 0, batch_y == 1)
+        false_positive = torch.bitwise_and(thresholded_predictions == 1, batch_y == 0).float()
+        false_negative = torch.bitwise_and(thresholded_predictions == 0, batch_y == 1).float()
         with torch.no_grad():
             norm = (torch.linalg.norm(self.network.fc1.weight) + torch.linalg.norm(self.network.fc2.weight)).item()
         return Breakdown(false_positive.mean(), false_negative.mean(), norm)

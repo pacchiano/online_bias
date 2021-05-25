@@ -12,18 +12,19 @@ from pytorch_experiments import (
     ExplorationHparams,
     LinearModelHparams,
     NNParams,
+    NUM_EXPERIMENTS,
 )
 
 PARALLEL = True
 # FAST = True
 # VERSION = "fast_ray_distr"
 FAST = False
-T = 3
-BATCH = 32
+T = 30
+BATCH = 1
 EPS_GREEDY = False
 METHOD = "pseudolabel_" if not EPS_GREEDY else "eps_greedy_"
-DECAY = 0.1
-VERSION = f"_{T}t_{METHOD}ray_no_warm_batch_{BATCH}_decay_{DECAY}"
+DECAY = 0.001
+VERSION = f"_{T}t_{METHOD}ray_no_warm_batch_{BATCH}_decay_{DECAY}_gpu"
 JOB_PREFIX = "fair_bandits_test"
 PARALLEL_STR = "_parallel" if PARALLEL else ""
 JOB_NAME = f"{JOB_PREFIX}{PARALLEL_STR}_{VERSION}"
@@ -55,13 +56,6 @@ def copy_and_run_with_config(
         jobs = executor.map_array(
             run_fn,
             *args,
-            # [run_config["dataset"]]*10,
-            # [run_config["training_mode"]]*10,
-            # [run_config["nn_params"]]*10,
-            # [run_config["linear_model_hparams"]]*10,
-            # [run_config["exploration_hparams"]]*10,
-            # [run_config["logging_frequency"]]*10,
-            # [run_config["num_experiments"]]*10
         )
         print(f"job_ids: {jobs}")
     else:
@@ -96,8 +90,8 @@ def get_parallel_args():
     exploration_hparams = [exploration_hparam] * len(datasets)
     # for eh in exploration_hparams:
     #     eh.loss_confidence_band = 0
-    num_experiments = [5] * len(datasets)
-    logging_frequency = [5] * len(datasets)
+    num_experiments = [NUM_EXPERIMENTS] * len(datasets)
+    logging_frequency = [int(T / 5)] * len(datasets)
     return [
         datasets, training_modes, nn_param_list, linear_model_hparams,
         exploration_hparams, num_experiments, logging_frequency
@@ -106,10 +100,13 @@ def get_parallel_args():
 
 working_directory = "/checkpoint/apacchiano/"
 partition = "prioritylab"
-gpus_per_node = 1
+gpus_per_node = 5
 ntasks_per_node = 1
 # ntasks_per_node = 5
-nodes = 3
+# TODO: not needed, this is only useful for distr.
+# nodes = 3
+# Job array can easily handle this.
+nodes = 1
 
 
 args = get_parallel_args()
@@ -125,6 +122,7 @@ copy_and_run_with_config(
     partition=partition,
     gpus_per_node=gpus_per_node,
     ntasks_per_node=ntasks_per_node,
+    gpus_per_task=5,
     cpus_per_task=5,
     # mem="470GB",
     mem="100GB",

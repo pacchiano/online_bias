@@ -11,13 +11,15 @@ from experiment_regret import run_regret_experiment_pytorch
 from typing import Any
 
 
-USE_RAY = True
-# USE_RAY = False
+# USE_RAY = True
+USE_RAY = False
 
 LINEWIDTH = 3.5
 LINESTYLE = "dashed"
 STD_GAP = 0.5
 ALPHA = 0.1
+# NUM_EXPERIMENTS = 5
+NUM_EXPERIMENTS = 1
 
 
 @dataclass
@@ -25,9 +27,7 @@ class NNParams:
     representation_layer_size = 40
     max_num_steps = 100
     baseline_steps = 10000
-    # batch_size = 32
-    batch_size = 1
-    # num_full_minimization_steps = 200
+    batch_size = 32
     num_full_minimization_steps = 100
     random_init = True
     restart_model_full_minimization = True
@@ -90,7 +90,7 @@ def conditionally(dec, cond):
     return resdec
 
 
-@conditionally(ray.remote, USE_RAY)
+@conditionally(ray.remote(num_gpus=NUM_EXPERIMENTS), USE_RAY)
 def run_experiment_parallel(
     dataset,
     training_mode,
@@ -632,9 +632,14 @@ def run_and_plot(
         open("{}/{}.p".format(base_data_directory, "data_dump"), "wb"),
     )
     # print(f"FPR and FNR: {experiment_summaries[-1][-1]}")
+    train_breakdown = experiment_summaries[-2]
+    test_breakdown = experiment_summaries[-1]
     pickle.dump(
         # FPR/FNR
-        experiment_summaries[-1],
+        (
+            train_breakdown,
+            test_breakdown,
+        ),
         open("{}/{}.p".format(base_data_directory, "fnr_dump"), "wb"),
     )
     end_time = time.time()
@@ -643,13 +648,14 @@ def run_and_plot(
 
 
 if __name__ == "__main__":
+    # dataset = "Adult"
     # dataset = "MultiSVM"
     dataset = "MNIST"
     training_mode = "full_minimization"
     nn_params = NNParams()
     nn_params.max_num_steps = 2
     nn_params.baseline_steps = 3
-    nn_params.batch_size = 10
+    nn_params.batch_size = 1
     linear_model_hparams = LinearModelHparams()
     exploration_hparams = ExplorationHparams()
     # exploration_hparams.decision_type = "simple"
@@ -657,7 +663,6 @@ if __name__ == "__main__":
     exploration_hparams.decision_type = "counterfactual"
     # exploration_hparams.loss_confidence_band = 0
     # TODO
-    num_experiments = 2
     logging_frequency = 1
     run_and_plot(
         dataset,
@@ -666,5 +671,5 @@ if __name__ == "__main__":
         linear_model_hparams,
         exploration_hparams,
         logging_frequency,
-        num_experiments,
+        NUM_EXPERIMENTS,
     )

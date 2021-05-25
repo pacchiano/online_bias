@@ -24,7 +24,6 @@ def train_model(
     for i in range(num_steps):
         if verbose:
             print("train model iteration ", i)
-        # print(train_dataset)
         batch_X, batch_y = train_dataset.get_batch(batch_size)
         if i == 0:
             if restart_model_full_minimization:
@@ -38,9 +37,9 @@ def train_model(
                 model.network.parameters(), lr=0.01, weight_decay=weight_decay
             )
 
-        print("getting loss")
-        print(type(batch_X))
-        print(batch_X)
+        # print("getting loss")
+        # print(type(batch_X))
+        # print(batch_X)
         optimizer.zero_grad()
         loss = model.get_loss(batch_X, batch_y)
 
@@ -56,7 +55,8 @@ def train_model_with_stopping(
     batch_size,
     verbose=False,
     restart_model_full_minimization=True,
-    eps=0.0001,
+    # eps=0.0001,
+    eps=0.01,
     max_epochs=7,
     eps_epoch_cycle=30,
     weight_decay=0.0
@@ -123,6 +123,7 @@ def train_model_with_stopping(
 
         total_num_steps += curr_epoch_size
 
+        # TODO: why?
         curr_epoch_size = 2 * curr_epoch_size
 
         curr_epoch_index += 1
@@ -132,6 +133,12 @@ def train_model_with_stopping(
             max_epochs += 1
             print("Minimization Expanded max epochs and expanded eps ")
 
+        # TODO: super expensive.
+        # Idea: train 5 models in parallel, look at min loss?
+        # doubling or not epochs...
+        # stop if within bound of previous?
+        # can check with self.
+        # might need to double bound/band
         if curr_epoch_index % max_epochs == 0:
             print(
                 "Curr epoch index ",
@@ -469,6 +476,7 @@ def run_regret_experiment_pytorch(
 
         # TRAIN THE UNBIASED MODEL
         if training_mode == "full_minimization":
+            # print("Adding data to unbiased dataset")
             unbiased_dataset.add_data(batch_X, batch_y)
             print(
                 "Start of full minimization training of the unbiased model -- timestep ",
@@ -514,10 +522,11 @@ def run_regret_experiment_pytorch(
                 if nn_params.pseudolabel:
                     # print("EVALUATING PSEUDO-LABEL")
                     # Add psuedo label and train.
-                    pseudo_Y = np.ones(batch_X.shape[0])
+                    pseudo_Y = torch.ones(batch_X.shape[0]).to('cuda')
                     # print(f"Pseudo label: {pseudo_Y}")
                     # print(f"Pseudo label shape: {pseudo_Y.shape}")
                     # print(f"Batch X shape: {batch_X.shape}")
+                    # print("Adding pseudo data to biased dataset")
                     biased_dataset.add_data(batch_X, pseudo_Y)
                     # TODO
                     model_biased_prediction = train_model_with_stopping(
@@ -628,54 +637,71 @@ def run_regret_experiment_pytorch(
         # print(type(global_biased_prediction))
         # if len(global_biased_prediction) == 1:
         # FIX fix fix
-        if type(global_biased_prediction) == torch.Tensor and global_biased_prediction.size()[0] == 1:
-            # label = batch_y.item()
-            # print(batch_y)
-            label = batch_y[0]
+        # if type(global_biased_prediction) == torch.Tensor and global_biased_prediction.size()[0] == 1:
+        #     # label = batch_y.item()
+        #     # print(batch_y)
+        #     label = batch_y[0]
+        #     accuracy, regret, accepted = process_prediction(
+        #         global_biased_prediction.item(), label, linear_model_hparams,
+        #         exploration_hparams, regret_wrt_baseline, baseline_accuracy
+        #     )
+        #     biased_train_accuracy += accuracy
+        #     batch_regret += regret
+        #     if accepted:
+        #         biased_batch_X.append(batch_X[0])
+        #         biased_batch_y.append(label)
+        #         biased_batch_size += 1
+        # else:
+        #     for i in range(len(global_biased_prediction)):
+        #         label = batch_y[i]
+        #         accuracy, regret, accepted = process_prediction(
+        #             global_biased_prediction[i], label, linear_model_hparams,
+        #             exploration_hparams, regret_wrt_baseline, baseline_accuracy
+        #         )
+        #         biased_train_accuracy += accuracy
+        #         batch_regret += regret
+        #         if accepted:
+        #             biased_batch_X.append(batch_X[i].unsqueeze(0))
+        #             biased_batch_y.append(label)
+        #             biased_batch_size += 1
+        try:
+            pred_len = len(global_biased_prediction)
+        except TypeError:
+            global_biased_prediction = global_biased_prediction.unsqueeze(-1)
+            pred_len = len(global_biased_prediction)
+        for i in range(pred_len):
+            label = batch_y[i]
             accuracy, regret, accepted = process_prediction(
-                global_biased_prediction.item(), label, linear_model_hparams,
+                global_biased_prediction[i], label, linear_model_hparams,
                 exploration_hparams, regret_wrt_baseline, baseline_accuracy
             )
             biased_train_accuracy += accuracy
             batch_regret += regret
             if accepted:
-                biased_batch_X.append(batch_X[0])
+                biased_batch_X.append(batch_X[i].unsqueeze(0))
                 biased_batch_y.append(label)
                 biased_batch_size += 1
-        else:
-            for i in range(len(global_biased_prediction)):
-                label = batch_y[i]
-                accuracy, regret, accepted = process_prediction(
-                    global_biased_prediction[i], label, linear_model_hparams,
-                    exploration_hparams, regret_wrt_baseline, baseline_accuracy
-                )
-                biased_train_accuracy += accuracy
-                batch_regret += regret
-                if accepted:
-                    biased_batch_X.append(batch_X[i])
-                    biased_batch_y.append(label)
-                    biased_batch_size += 1
-        biased_batch_X = np.array(biased_batch_X)
-        biased_batch_y = np.array(biased_batch_y)
-
-        try:
-            size = len(global_biased_prediction)
-        except TypeError:
-            size = 1
+        size = len(global_biased_prediction)
         biased_train_accuracy = biased_train_accuracy / size
         batch_regret = batch_regret / size * 1.0
 
         biased_data_totals += biased_batch_size
 
+        # biased_batch_X = torch.from_numpy(np.array(biased_batch_X).astype(np.float64))
+        # biased_batch_y = torch.from_numpy(np.array(biased_batch_y).astype(np.float64))
+        biased_batch_X = torch.cat(biased_batch_X)
+        biased_batch_y = torch.Tensor(biased_batch_y).to('cuda')
+
         # Train biased model on biased data
         if biased_batch_size > 0:
             if training_mode == "full_minimization":
+                # print("Adding data to biased dataset")
                 biased_dataset.add_data(biased_batch_X, biased_batch_y)
                 # model_biased = train_model(
                 #     model_biased, num_full_minimization_steps, biased_dataset,
                 # batch_size, restart_model_full_minimization =
                 # restart_model_full_minimization)
-                print(f"Biased dataset: {biased_dataset}")
+                # print(f"Biased dataset: {biased_dataset}")
                 model_biased = train_model_with_stopping(
                     model_biased,
                     num_full_minimization_steps,
