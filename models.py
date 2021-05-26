@@ -146,7 +146,7 @@ class TorchBinaryLogisticRegression:
 
     def get_representation(self, batch_X):
         batch_X = self.__update_batch(batch_X)
-        batch_X = torch.from_numpy(batch_X)
+        # batch_X = torch.from_numpy(batch_X)
         _, representations = self.network(batch_X.float())
         return representations
 

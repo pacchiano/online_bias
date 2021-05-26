@@ -658,9 +658,9 @@ if __name__ == "__main__":
     nn_params.batch_size = 1
     linear_model_hparams = LinearModelHparams()
     exploration_hparams = ExplorationHparams()
-    # exploration_hparams.decision_type = "simple"
-    # exploration_hparams.epsilon_greedy = True
-    exploration_hparams.decision_type = "counterfactual"
+    exploration_hparams.decision_type = "simple"
+    exploration_hparams.epsilon_greedy = False
+    # exploration_hparams.decision_type = "counterfactual"
     # exploration_hparams.loss_confidence_band = 0
     # TODO
     logging_frequency = 1

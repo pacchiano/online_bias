@@ -499,13 +499,17 @@ def run_regret_experiment_pytorch(
             )
 
         if exploration_hparams.decision_type == "simple":
-            # Training biased model
-            global_biased_prediction, protected_biased_predictions = get_predictions(
-                global_batch,
-                protected_batches,
-                model_biased,
-                inverse_cummulative_data_covariance,
-            )
+            if biased_dataset.get_size() == 0:
+                # ACCEPT ALL POINTS IF THE BIASED DATASET IS NOT INITIALIZED
+                global_biased_prediction = [1 for _ in range(nn_params.batch_size)]
+            else:
+                # Training biased model
+                global_biased_prediction, protected_biased_predictions = get_predictions(
+                    global_batch,
+                    protected_batches,
+                    model_biased,
+                    inverse_cummulative_data_covariance,
+                )
 
         elif exploration_hparams.decision_type == "counterfactual":
             print(f"Training mode: {training_mode}")
@@ -687,10 +691,10 @@ def run_regret_experiment_pytorch(
 
         biased_data_totals += biased_batch_size
 
-        # biased_batch_X = torch.from_numpy(np.array(biased_batch_X).astype(np.float64))
-        # biased_batch_y = torch.from_numpy(np.array(biased_batch_y).astype(np.float64))
-        biased_batch_X = torch.cat(biased_batch_X)
-        biased_batch_y = torch.Tensor(biased_batch_y).to('cuda')
+        # import pdb; pdb.set_trace()
+        if len(biased_batch_X) > 0:
+            biased_batch_X = torch.cat(biased_batch_X)
+            biased_batch_y = torch.Tensor(biased_batch_y).to('cuda')
 
         # Train biased model on biased data
         if biased_batch_size > 0:
@@ -725,7 +729,8 @@ def run_regret_experiment_pytorch(
                 representation_X = model_biased.get_representation(
                     biased_batch_X
                 ).detach()
-                representation_X = representation_X.numpy()
+                # representation_X = representation_X.numpy()
+                representation_X = representation_X.cpu().numpy()
                 if exploration_hparams.adjust_mahalanobis:
                     if len(cummulative_data_covariance) == 0:
                         cummulative_data_covariance = np.dot(
