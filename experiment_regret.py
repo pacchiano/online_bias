@@ -28,6 +28,7 @@ def train_model(
             print("train model iteration ", i)
         batch_X, batch_y = train_dataset.get_batch(batch_size)
         if i == 0:
+            restart_model_full_minimization = False
             if restart_model_full_minimization:
                 # print("Batch X: ")
                 # print(batch_X.shape)
@@ -359,7 +360,6 @@ def run_regret_experiment_pytorch(
     verbose = False
     regret_wrt_baseline = exploration_hparams.regret_wrt_baseline
     num_full_minimization_steps = nn_params.num_full_minimization_steps
-    restart_model_full_minimization = nn_params.restart_model_full_minimization
     TEST_BATCH_SIZE = 1000
 
     # TODO
@@ -391,6 +391,9 @@ def run_regret_experiment_pytorch(
                 "Decision type set to counterfactual, can't set exploration constants."
             )
 
+    # TODO: kinda dumb
+    batch_X, batch_y = train_dataset.get_batch(baseline_batch_size)
+    baseline_model.initialize_model(batch_X.shape[1])
     baseline_model = train_model(
         baseline_model, nn_params.baseline_steps, train_dataset, baseline_batch_size
     )
@@ -568,36 +571,49 @@ def run_regret_experiment_pytorch(
                     "The counterfactual decision mode is incompatible with all "
                     "training modes different from full_minimization"
                 )
-
             if biased_dataset.get_size() == 0:
                 # ACCEPT ALL POINTS IF THE BIASED DATASET IS NOT INITIALIZED
                 global_biased_prediction = [1 for _ in range(nn_params.batch_size)]
             else:
                 # First get epsilon greedy, then apply pseudolabel.
-                # TODO
-                global_biased_prediction, protected_biased_predictions = get_predictions(
+                # batch_size x 1
+                initial_biased_pred, _ = get_predictions(
                     global_batch,
                     protected_batches,
                     model_biased,
                     inverse_cummulative_data_covariance,
                 )
-                # TODO: eps greedy says take.
-                if global_biased_prediction < linear_model_hparams.biased_threshold and (
-                    exploration_hparams.epsilon_greedy
-                    and np.random.random() < exploration_hparams.epsilon
-                ):
+                # TODO: check if epsilon set?
+                epsilon_fit = torch.rand_like(initial_biased_pred) < exploration_hparams.epsilon
+                random_action = torch.bitwise_and(
+                        initial_biased_pred < linear_model_hparams.biased_threshold,
+                        epsilon_fit
+                )
+                random_indices = torch.nonzero(random_action).squeeze(dim=1)
+                model_indices = torch.nonzero(~random_action).squeeze(dim=1)
+                model_pred = initial_biased_pred[model_indices]
+                # create pseudo batch from random decision indices.
+                pseudo_batch = (
+                    global_batch[0][random_indices],
+                    global_batch[1][random_indices]
+                )
+                # If no random points, just take model predictions.
+                global_biased_prediction = torch.zeros_like(initial_biased_pred)
+                global_biased_prediction[model_indices] = model_pred
+                # If random points, add those in.
+                if pseudo_batch[0].size()[0] > 0:
                     # Confirm via pseudolabel.
-                    if nn_params.pseudolabel:
-                        # print("EVALUATING PSEUDO-LABEL")
-                        eps = 0.0001 * np.log(counter + 2) / 2
-                        global_biased_prediction, model_biased_prediction = pseudolabel(
-                            model_biased_prediction, nn_params, verbose,
-                            eps, test_batch=global_batch,
-                            protected_batches_test=protected_batches,
-                            train_dataset=biased_dataset,
-                        )
-                    else:
-                        raise ValueError("Pseudolabel only now")
+                    # print("EVALUATING PSEUDO-LABEL")
+                    eps = 0.0001 * np.log(counter + 2) / 2
+                    # Clone model before psuedolabeling.
+                    model_biased_prediction.network.load_state_dict(model_biased.network.state_dict())
+                    pseudo_pred, model_biased_prediction = pseudolabel(
+                        model_biased_prediction, nn_params, verbose,
+                        eps, test_batch=pseudo_batch,
+                        protected_batches_test=protected_batches,  # meaningless
+                        train_dataset=biased_dataset,
+                    )
+                    global_biased_prediction[random_indices] = pseudo_pred
 
         biased_batch_X = []
         biased_batch_y = []
@@ -637,15 +653,23 @@ def run_regret_experiment_pytorch(
             if training_mode == "full_minimization":
                 # print("Adding data to biased dataset")
                 biased_dataset.add_data(biased_batch_X, biased_batch_y)
-                model_biased = train_model_with_stopping(
-                    model_biased,
-                    num_full_minimization_steps,
-                    biased_dataset,
-                    nn_params.batch_size,
-                    verbose=verbose,
-                    restart_model_full_minimization=restart_model_full_minimization,
-                    eps=0.0001 * np.log(counter + 2) / 2,
-                )
+                if FIXED_STEPS:
+                    model_biased = train_model(
+                        model_biased,
+                        num_full_minimization_steps,
+                        biased_dataset,
+                        nn_params.batch_size,
+                    )
+                else:
+                    model_biased = train_model_with_stopping(
+                        model_biased,
+                        num_full_minimization_steps,
+                        biased_dataset,
+                        nn_params.batch_size,
+                        verbose=verbose,
+                        restart_model_full_minimization=nn_params.restart_model_full_minimization,
+                        eps=0.0001 * np.log(counter + 2) / 2,
+                    )
                 gc.collect()
 
             elif training_mode == "gradient_step":
@@ -806,14 +830,14 @@ def pseudolabel(
     if FIXED_STEPS:
         model = train_model(
             model,
-            nn_params.num_full_minimization_steps,
+            nn_params.num_full_minimization_steps * nn_params.pseudo_steps_multiplier,
             train_dataset,
             nn_params.batch_size,
         )
     else:
         model = train_model_with_stopping(
             model,
-            nn_params.num_full_minimization_steps,
+            nn_params.num_full_minimization_steps * nn_params.pseudo_steps_multiplier,
             train_dataset,
             nn_params.batch_size,
             verbose=verbose,

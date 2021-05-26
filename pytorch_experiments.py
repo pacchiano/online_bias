@@ -11,10 +11,10 @@ from experiment_regret import run_regret_experiment_pytorch
 from typing import Any
 
 
-# USE_RAY = True
-# NUM_EXPERIMENTS = 5
-USE_RAY = False
-NUM_EXPERIMENTS = 1
+USE_RAY = True
+NUM_EXPERIMENTS = 5
+# USE_RAY = False
+# NUM_EXPERIMENTS = 1
 
 LINEWIDTH = 3.5
 LINESTYLE = "dashed"
@@ -29,6 +29,7 @@ class NNParams:
     baseline_steps = 10000
     batch_size = 32
     num_full_minimization_steps = 100
+    psuedo_steps_multiplier = 4
     random_init = True
     restart_model_full_minimization = True
     weight_decay = 0.0
@@ -585,7 +586,7 @@ def run_and_plot(
 
     print(
         f"Starting Experiment {dataset} T{nn_params.max_num_steps} "
-        f"{training_mode} {exploration_hparams}"
+        f"{training_mode} {repr(exploration_hparams)}"
     )
     experiment_summaries = run_experiments(
         dataset,
@@ -620,16 +621,19 @@ def run_and_plot(
         (
             timesteps,
             nn_params.max_num_steps,
-            experiment_results.mean_test_biased_accuracies_cum_averages,
-            experiment_results.std_test_biased_accuracies_cum_averages,
-            experiment_results.mean_accuracies_cum_averages,
-            experiment_results.std_accuracies_cum_averages,
-            experiment_results.mean_train_biased_accuracies_cum_averages,
-            experiment_results.std_train_biased_accuracies_cum_averages,
-            experiment_results.mean_loss_validation_averages,
-            experiment_results.std_loss_validation_averages,
-            experiment_results.mean_loss_validation_biased_averages,
-            experiment_results.std_loss_validation_biased_averages,
+            experiment_results,
+            # experiment_results.mean_test_biased_accuracies_cum_averages,  # 2
+            # experiment_results.std_test_biased_accuracies_cum_averages,
+            # experiment_results.mean_accuracies_cum_averages,  # 4
+            # experiment_results.std_accuracies_cum_averages,
+            # experiment_results.mean_train_biased_accuracies_cum_averages,  # 6
+            # experiment_results.std_train_biased_accuracies_cum_averages,
+            # experiment_results.mean_loss_validation_averages,  # 8
+            # experiment_results.std_loss_validation_averages,
+            # experiment_results.mean_loss_validation_biased_averages,  # 10
+            # experiment_results.std_loss_validation_biased_averages,
+            # experiment_results.mean_train_cum_regret_averages,  # 12
+            # experiment_results.std_train_cum_regret_averages,
         ),
         open("{}/{}.p".format(base_data_directory, "data_dump"), "wb"),
     )
@@ -657,24 +661,25 @@ def run_and_plot(
 
 
 if __name__ == "__main__":
-    dataset = "Adult"
+    # dataset = "Adult"
     # dataset = "MultiSVM"
-    # dataset = "MNIST"
+    dataset = "MNIST"
     training_mode = "full_minimization"
     # training_mode = "gradient_step"
     nn_params = NNParams()
-    nn_params.max_num_steps = 20
-    nn_params.baseline_steps = 100
+    nn_params.max_num_steps = 300
+    nn_params.baseline_steps = 10000
     # nn_params.batch_size = 1
     nn_params.batch_size = 32
     linear_model_hparams = LinearModelHparams()
     exploration_hparams = ExplorationHparams()
-    # exploration_hparams.decision_type = "simple"
-    # exploration_hparams.epsilon_greedy = False
-    exploration_hparams.decision_type = "counterfactual"
+    exploration_hparams.decision_type = "simple"
+    # exploration_hparams.epsilon_greedy = True
+    exploration_hparams.epsilon_greedy = False
+    # exploration_hparams.decision_type = "counterfactual"
     # exploration_hparams.loss_confidence_band = 0
     # TODO
-    logging_frequency = 1
+    logging_frequency = 10
     run_and_plot(
         dataset,
         training_mode,
