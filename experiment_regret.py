@@ -11,6 +11,8 @@ from models import (
     get_error_breakdown
 )
 
+FIXED_STEPS = True
+
 
 def train_model(
     model,
@@ -359,7 +361,13 @@ def run_regret_experiment_pytorch(
     num_full_minimization_steps = nn_params.num_full_minimization_steps
     restart_model_full_minimization = nn_params.restart_model_full_minimization
     estimate_loss_confidence_band = True
+    TEST_BATCH_SIZE = 1000
 
+    # TODO
+    if dataset == "MNIST" or dataset == "Adult":
+        baseline_batch_size = nn_params.batch_size
+    else:
+        baseline_batch_size = 10
     (
         protected_datasets_train,
         protected_datasets_test,
@@ -367,8 +375,9 @@ def run_regret_experiment_pytorch(
         test_dataset,
     ) = get_dataset(
         dataset=dataset,
-        batch_size=nn_params.batch_size,
-        test_batch_size=1000
+        # batch_size=nn_params.batch_size,
+        batch_size=baseline_batch_size,
+        test_batch_size=TEST_BATCH_SIZE
     )
     baseline_model = TorchBinaryLogisticRegression(
         random_init=nn_params.random_init,
@@ -383,11 +392,6 @@ def run_regret_experiment_pytorch(
             raise ValueError(
                 "Decision type set to counterfactual, can't set exploration constants."
             )
-    # TODO
-    if dataset == "MNIST" or dataset == "Adult":
-        baseline_batch_size = nn_params.batch_size
-    else:
-        baseline_batch_size = 10
 
     baseline_model = train_model(
         baseline_model, nn_params.baseline_steps, train_dataset, baseline_batch_size
@@ -396,7 +400,8 @@ def run_regret_experiment_pytorch(
 
     with torch.no_grad():
         baseline_batch_test, protected_batches_test = get_batches(
-            protected_datasets_test, test_dataset, 1000
+            # protected_datasets_test, test_dataset, 1000
+            protected_datasets_test, test_dataset, TEST_BATCH_SIZE
         )
         baseline_accuracy, _ = get_accuracies(
             baseline_batch_test,
@@ -409,6 +414,40 @@ def run_regret_experiment_pytorch(
         )
 
     print("Baseline model accuracy {}".format(baseline_accuracy))
+
+    # print("EVALUATING PSEUDO-LABEL BASELINE")
+    # # eps = 0.0001 * np.log(counter + 2) / 2
+    # # eps = 0.0001 * np.log(2) / 2
+    # eps = 1.0
+    # # TODO: mnist specific.
+    # funny_set = GrowingNumpyDataSet()
+    # for i in range(1000):
+    #     data_X, data_Y = train_dataset.get_batch(nn_params.batch_size)
+    #     funny_set.add_data(data_X, data_Y)
+    # baseline_batch_test_2, protected_batches_test_2 = get_batches(
+    #     # protected_datasets_test, test_dataset, nn_params.batch_size
+    #     protected_datasets_test, test_dataset, TEST_BATCH_SIZE
+    # )
+    # preds, baseline_pseudo_model = pseudolabel(
+    #     baseline_model, nn_params, verbose,
+    #     eps, test_batch=baseline_batch_test_2,
+    #     protected_batches_test=protected_batches_test_2, train_dataset=funny_set,
+    #     upweight=2
+    # )
+    # # TODO: is this always 1?
+    # print("Here is the psuedo baseline pred: ")
+    # print(preds.mean())
+    # with torch.no_grad():
+    #     baseline_accuracy, _ = get_accuracies(
+    #         baseline_batch_test_2,
+    #         # irrelevant
+    #         protected_batches_test,
+    #         baseline_pseudo_model,
+    #         linear_model_hparams.threshold,
+    #     )
+    #     print("Here is the psuedo baseline accuracy: ")
+    #     print(baseline_accuracy)
+    # raise ValueError()
 
     accuracies_list = []
     biased_accuracies_list = []
@@ -451,9 +490,11 @@ def run_regret_experiment_pytorch(
     train_accuracies_biased = []
     timesteps = []
 
-    if training_mode == "full_minimization":
-        biased_dataset = GrowingNumpyDataSet()
-        unbiased_dataset = GrowingNumpyDataSet()
+    # if training_mode == "full_minimization":
+    #     biased_dataset = GrowingNumpyDataSet()
+    #     unbiased_dataset = GrowingNumpyDataSet()
+    biased_dataset = GrowingNumpyDataSet()
+    unbiased_dataset = GrowingNumpyDataSet()
 
     while counter < nn_params.max_num_steps:
         counter += 1
@@ -482,15 +523,23 @@ def run_regret_experiment_pytorch(
                 "Start of full minimization training of the unbiased model -- timestep ",
                 counter,
             )
-            model = train_model_with_stopping(
-                model,
-                num_full_minimization_steps,
-                unbiased_dataset,
-                nn_params.batch_size,
-                verbose=verbose,
-                restart_model_full_minimization=nn_params.restart_model_full_minimization,
-                eps=0.0001 * np.log(counter + 2) / 2,
-            )
+            if FIXED_STEPS:
+                model = train_model(
+                    model,
+                    num_full_minimization_steps,
+                    unbiased_dataset,
+                    nn_params.batch_size,
+                )
+            else:
+                model = train_model_with_stopping(
+                    model,
+                    num_full_minimization_steps,
+                    unbiased_dataset,
+                    nn_params.batch_size,
+                    verbose=verbose,
+                    restart_model_full_minimization=nn_params.restart_model_full_minimization,
+                    eps=0.0001 * np.log(counter + 2) / 2,
+                )
             gc.collect()
 
         elif training_mode == "gradient_step":
@@ -499,6 +548,12 @@ def run_regret_experiment_pytorch(
             )
 
         if exploration_hparams.decision_type == "simple":
+            # global_biased_prediction, protected_biased_predictions = get_predictions(
+            #     global_batch,
+            #     protected_batches,
+            #     model_biased,
+            #     inverse_cummulative_data_covariance,
+            # )
             if biased_dataset.get_size() == 0:
                 # ACCEPT ALL POINTS IF THE BIASED DATASET IS NOT INITIALIZED
                 global_biased_prediction = [1 for _ in range(nn_params.batch_size)]
@@ -525,33 +580,12 @@ def run_regret_experiment_pytorch(
             else:
                 if nn_params.pseudolabel:
                     # print("EVALUATING PSEUDO-LABEL")
-                    # Add psuedo label and train.
-                    pseudo_Y = torch.ones(batch_X.shape[0]).to('cuda')
-                    # print(f"Pseudo label: {pseudo_Y}")
-                    # print(f"Pseudo label shape: {pseudo_Y.shape}")
-                    # print(f"Batch X shape: {batch_X.shape}")
-                    # print("Adding pseudo data to biased dataset")
-                    biased_dataset.add_data(batch_X, pseudo_Y)
-                    # TODO
-                    model_biased_prediction = train_model_with_stopping(
-                        model_biased_prediction,
-                        num_full_minimization_steps,
-                        biased_dataset,
-                        nn_params.batch_size,
-                        verbose=verbose,
-                        restart_model_full_minimization=nn_params.restart_model_full_minimization,
-                        eps=0.0001 * np.log(counter + 2) / 2,
-                        weight_decay=nn_params.weight_decay
-                    )
-                    # model_biased_prediction = train_model(
-                    #     model_biased_prediction, num_full_minimization_steps,
-                    #     biased_dataset, nn_params.batch_size,
-                    #     restart_model_full_minimization=nn_params.restart_model_full_minimization,
-                    #     weight_decay=nn_params.weight_decay
-                    # )
-                    biased_dataset.pop_last_data()
-                    global_biased_prediction, _ = get_predictions(
-                        global_batch, protected_batches, model_biased_prediction
+                    eps = 0.0001 * np.log(counter + 2) / 2
+                    global_biased_prediction, model_biased_prediction = pseudolabel(
+                        model_biased_prediction, nn_params, verbose,
+                        eps, test_batch=global_batch,
+                        protected_batches_test=protected_batches,
+                        train_dataset=biased_dataset,
                     )
                 else:
                     # EVALUATE THE EXPECTED LOSS
@@ -861,6 +895,40 @@ def run_regret_experiment_pytorch(
         train_error_breakdown_list,
         test_error_breakdown_list,
     )
+
+
+def pseudolabel(
+    model, nn_params, verbose, eps, test_batch, protected_batches_test, train_dataset,
+    upweight=1
+):
+    # Treat all points as accepted.
+    batch_X = test_batch[0]
+    pseudo_Y = torch.ones(batch_X.shape[0]).to('cuda')
+    for x in range(upweight):
+        train_dataset.add_data(batch_X, pseudo_Y)
+    if FIXED_STEPS:
+        model = train_model(
+            model,
+            nn_params.num_full_minimization_steps,
+            train_dataset,
+            nn_params.batch_size,
+        )
+    else:
+        model = train_model_with_stopping(
+            model,
+            nn_params.num_full_minimization_steps,
+            train_dataset,
+            nn_params.batch_size,
+            verbose=verbose,
+            restart_model_full_minimization=nn_params.restart_model_full_minimization,
+            eps=eps,
+            weight_decay=nn_params.weight_decay
+        )
+    train_dataset.pop_last_data()
+    global_biased_prediction, _ = get_predictions(
+        test_batch, protected_batches_test, model
+    )
+    return global_biased_prediction, model
 
 
 def process_prediction(
