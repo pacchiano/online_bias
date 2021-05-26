@@ -358,7 +358,6 @@ def run_regret_experiment_pytorch(
     regret_wrt_baseline = exploration_hparams.regret_wrt_baseline
     num_full_minimization_steps = nn_params.num_full_minimization_steps
     restart_model_full_minimization = nn_params.restart_model_full_minimization
-    estimate_loss_confidence_band = True
     TEST_BATCH_SIZE = 1000
 
     # TODO
@@ -373,7 +372,6 @@ def run_regret_experiment_pytorch(
         test_dataset,
     ) = get_dataset(
         dataset=dataset,
-        # batch_size=nn_params.batch_size,
         batch_size=baseline_batch_size,
         test_batch_size=TEST_BATCH_SIZE
     )
@@ -398,7 +396,6 @@ def run_regret_experiment_pytorch(
 
     with torch.no_grad():
         baseline_batch_test, protected_batches_test = get_batches(
-            # protected_datasets_test, test_dataset, 1000
             protected_datasets_test, test_dataset, TEST_BATCH_SIZE
         )
         baseline_accuracy, _ = get_accuracies(
@@ -513,7 +510,6 @@ def run_regret_experiment_pytorch(
 
         # TRAIN THE UNBIASED MODEL
         if training_mode == "full_minimization":
-            # print("Adding data to unbiased dataset")
             unbiased_dataset.add_data(batch_X, batch_y)
             print(
                 "Start of full minimization training of the unbiased model -- timestep ",
@@ -540,7 +536,6 @@ def run_regret_experiment_pytorch(
                 # ACCEPT ALL POINTS IF THE BIASED DATASET IS NOT INITIALIZED
                 global_biased_prediction = [1 for _ in range(nn_params.batch_size)]
             else:
-                # Training biased model
                 global_biased_prediction, protected_biased_predictions = get_predictions(
                     global_batch,
                     protected_batches,
@@ -560,93 +555,31 @@ def run_regret_experiment_pytorch(
                 # ACCEPT ALL POINTS IF THE BIASED DATASET IS NOT INITIALIZED
                 global_biased_prediction = [1 for _ in range(nn_params.batch_size)]
             else:
-                if nn_params.pseudolabel:
-                    # print("EVALUATING PSEUDO-LABEL")
-                    eps = 0.0001 * np.log(counter + 2) / 2
-                    global_biased_prediction, model_biased_prediction = pseudolabel(
-                        model_biased_prediction, nn_params, verbose,
-                        eps, test_batch=global_batch,
-                        protected_batches_test=protected_batches,
-                        train_dataset=biased_dataset,
-                    )
-                else:
-                    # EVALUATE THE EXPECTED LOSS
-                    with torch.no_grad():
-                        all_data_X, all_data_Y = biased_dataset.get_batch(10000000000)
-                        # Evaluate the loss over the existing dataset.
-                        loss_initial = model_biased.get_loss(all_data_X, all_data_Y)
-
-                    if exploration_hparams.loss_confidence_band is not None:
-                        loss_confidence_band = exploration_hparams.loss_confidence_band
-                    elif estimate_loss_confidence_band:
-                        print("Starting computation of the loss confidence band ")
-                        (
-                            loss_confidence_band,
-                            mean_loss_confidence_band,
-                        ) = compute_loss_confidence_band_with_stopping(
-                            10,
-                            model_biased,
-                            num_full_minimization_steps,
-                            biased_dataset,
-                            nn_params.batch_size,
-                            bottom_half=True,
-                            eps=0.0001 * np.log(counter + 2) / 2,
+                # First get epsilon greedy, then apply pseudolabel.
+                # TODO
+                global_biased_prediction, protected_biased_predictions = get_predictions(
+                    global_batch,
+                    protected_batches,
+                    model_biased,
+                    inverse_cummulative_data_covariance,
+                )
+                # TODO: eps greedy says take.
+                if global_biased_prediction < linear_model_hparams.biased_threshold and (
+                    exploration_hparams.epsilon_greedy
+                    and np.random.random() < exploration_hparams.epsilon
+                ):
+                    # Confirm via pseudolabel.
+                    if nn_params.pseudolabel:
+                        # print("EVALUATING PSEUDO-LABEL")
+                        eps = 0.0001 * np.log(counter + 2) / 2
+                        global_biased_prediction, model_biased_prediction = pseudolabel(
+                            model_biased_prediction, nn_params, verbose,
+                            eps, test_batch=global_batch,
+                            protected_batches_test=protected_batches,
+                            train_dataset=biased_dataset,
                         )
-                        loss_confidence_band *= 2
-                        loss_confidence_band += 0.0001 * np.log(counter + 2) / 2
-                        # loss_confidence_band = 2*compute_loss_confidence_band(
-                        # 10, model_biased, num_full_minimization_steps, biased_dataset,
-                        # batch_size, verbose = False
-                        # )
-                        gc.collect()
                     else:
-                        loss_confidence_band = loss_initial
-
-                    # TODO: this is really small always...
-                    # print('HERE WE HAVE THE LOSS CONFIDENCE BAND: \n')
-                    # print(loss_confidence_band)
-
-                    counterfactual_reg = 1  # COUNTERFACTUAL REGULARIZATION
-
-                    model_biased_prediction = train_model_counterfactual_with_stopping(
-                        model_biased_prediction,
-                        loss_initial,
-                        loss_confidence_band,
-                        num_full_minimization_steps,
-                        biased_dataset,
-                        batch_X,
-                        nn_params.batch_size,
-                        counterfactual_reg,
-                        verbose=False,
-                        restart_model_full_minimization=False,
-                    )
-
-                    # loss_final = float("inf")
-
-                    # while loss_final > loss_initial + loss_confidence_band:
-                    #   print("Recomputing .... ")
-                    #   print(
-                    #     "Start training of conterfactual model", "loss initial ",
-                    #     loss_initial, " loss confidence band ", loss_confidence_band,
-                    # " loss_final ", loss_final)
-                    #   model_biased_prediction = train_model_counterfactual(
-                    # model_biased_prediction,  num_full_minimization_steps, biased_dataset,
-                    # batch_size, batch_X,
-                    #     counterfactual_regularizer = counterfactual_reg, verbose = (
-                    # False, restart_model_full_minimization = False)
-                    #   gc.collect()
-
-                    #   ### EVALUATE THE EXPECTED LOSS ##
-                    #   with torch.no_grad():
-                    #     loss_final = model_biased_prediction.get_loss(
-                    # all_data_X, all_data_Y)
-
-                    #   counterfactual_reg *= .5*counterfactual_reg
-
-                    global_biased_prediction, _ = get_predictions(
-                        global_batch, protected_batches, model_biased_prediction
-                    )
-                    print("Global biased prediction ", global_biased_prediction)
+                        raise ValueError("Pseudolabel only now")
 
         biased_batch_X = []
         biased_batch_y = []
@@ -654,36 +587,7 @@ def run_regret_experiment_pytorch(
         biased_train_accuracy = 0
         batch_regret = 0
 
-        # print(type(global_biased_prediction))
-        # if len(global_biased_prediction) == 1:
-        # FIX fix fix
-        # if type(global_biased_prediction) == torch.Tensor and global_biased_prediction.size()[0] == 1:
-        #     # label = batch_y.item()
-        #     # print(batch_y)
-        #     label = batch_y[0]
-        #     accuracy, regret, accepted = process_prediction(
-        #         global_biased_prediction.item(), label, linear_model_hparams,
-        #         exploration_hparams, regret_wrt_baseline, baseline_accuracy
-        #     )
-        #     biased_train_accuracy += accuracy
-        #     batch_regret += regret
-        #     if accepted:
-        #         biased_batch_X.append(batch_X[0])
-        #         biased_batch_y.append(label)
-        #         biased_batch_size += 1
-        # else:
-        #     for i in range(len(global_biased_prediction)):
-        #         label = batch_y[i]
-        #         accuracy, regret, accepted = process_prediction(
-        #             global_biased_prediction[i], label, linear_model_hparams,
-        #             exploration_hparams, regret_wrt_baseline, baseline_accuracy
-        #         )
-        #         biased_train_accuracy += accuracy
-        #         batch_regret += regret
-        #         if accepted:
-        #             biased_batch_X.append(batch_X[i].unsqueeze(0))
-        #             biased_batch_y.append(label)
-        #             biased_batch_size += 1
+        # TODO: pull out and combine with method above.
         try:
             pred_len = len(global_biased_prediction)
         except TypeError:
@@ -706,8 +610,6 @@ def run_regret_experiment_pytorch(
         batch_regret = batch_regret / size * 1.0
 
         biased_data_totals += biased_batch_size
-
-        # import pdb; pdb.set_trace()
         if len(biased_batch_X) > 0:
             biased_batch_X = torch.cat(biased_batch_X)
             biased_batch_y = torch.Tensor(biased_batch_y).to('cuda')
@@ -717,11 +619,6 @@ def run_regret_experiment_pytorch(
             if training_mode == "full_minimization":
                 # print("Adding data to biased dataset")
                 biased_dataset.add_data(biased_batch_X, biased_batch_y)
-                # model_biased = train_model(
-                #     model_biased, num_full_minimization_steps, biased_dataset,
-                # batch_size, restart_model_full_minimization =
-                # restart_model_full_minimization)
-                # print(f"Biased dataset: {biased_dataset}")
                 model_biased = train_model_with_stopping(
                     model_biased,
                     num_full_minimization_steps,
@@ -928,3 +825,84 @@ def process_prediction(
     # return biased_train_accuracy += (accept_point == label) * 1.0
     accuracy = (accept_point == label) * 1.0
     return accuracy, regret, accept_point
+
+
+# DEF counterfactual min
+# else:
+#     # EVALUATE THE EXPECTED LOSS
+#     with torch.no_grad():
+#         all_data_X, all_data_Y = biased_dataset.get_batch(10000000000)
+#         # Evaluate the loss over the existing dataset.
+#         loss_initial = model_biased.get_loss(all_data_X, all_data_Y)
+
+#     if exploration_hparams.loss_confidence_band is not None:
+#         loss_confidence_band = exploration_hparams.loss_confidence_band
+#     elif estimate_loss_confidence_band:
+#         print("Starting computation of the loss confidence band ")
+#         (
+#             loss_confidence_band,
+#             mean_loss_confidence_band,
+#         ) = compute_loss_confidence_band_with_stopping(
+#             10,
+#             model_biased,
+#             num_full_minimization_steps,
+#             biased_dataset,
+#             nn_params.batch_size,
+#             bottom_half=True,
+#             eps=0.0001 * np.log(counter + 2) / 2,
+#         )
+#         loss_confidence_band *= 2
+#         loss_confidence_band += 0.0001 * np.log(counter + 2) / 2
+#         # loss_confidence_band = 2*compute_loss_confidence_band(
+#         # 10, model_biased, num_full_minimization_steps, biased_dataset,
+#         # batch_size, verbose = False
+#         # )
+#         gc.collect()
+#     else:
+#         loss_confidence_band = loss_initial
+
+#     # TODO: this is really small always...
+#     # print('HERE WE HAVE THE LOSS CONFIDENCE BAND: \n')
+#     # print(loss_confidence_band)
+
+#     counterfactual_reg = 1  # COUNTERFACTUAL REGULARIZATION
+
+#     model_biased_prediction = train_model_counterfactual_with_stopping(
+#         model_biased_prediction,
+#         loss_initial,
+#         loss_confidence_band,
+#         num_full_minimization_steps,
+#         biased_dataset,
+#         batch_X,
+#         nn_params.batch_size,
+#         counterfactual_reg,
+#         verbose=False,
+#         restart_model_full_minimization=False,
+#     )
+
+#     # loss_final = float("inf")
+
+#     # while loss_final > loss_initial + loss_confidence_band:
+#     #   print("Recomputing .... ")
+#     #   print(
+#     #     "Start training of conterfactual model", "loss initial ",
+#     #     loss_initial, " loss confidence band ", loss_confidence_band,
+#     # " loss_final ", loss_final)
+#     #   model_biased_prediction = train_model_counterfactual(
+#     # model_biased_prediction,  num_full_minimization_steps, biased_dataset,
+#     # batch_size, batch_X,
+#     #     counterfactual_regularizer = counterfactual_reg, verbose = (
+#     # False, restart_model_full_minimization = False)
+#     #   gc.collect()
+
+#     #   ### EVALUATE THE EXPECTED LOSS ##
+#     #   with torch.no_grad():
+#     #     loss_final = model_biased_prediction.get_loss(
+#     # all_data_X, all_data_Y)
+
+#     #   counterfactual_reg *= .5*counterfactual_reg
+
+#     global_biased_prediction, _ = get_predictions(
+#         global_batch, protected_batches, model_biased_prediction
+#     )
+#     print("Global biased prediction ", global_biased_prediction)

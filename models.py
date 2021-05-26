@@ -198,40 +198,17 @@ class TorchBinaryLogisticRegression:
         #   return self.__loss(h, batch_y)
 
     def predict_prob(self, batch_X, inverse_data_covariance=[]):
-        # self.__initialize_theta(batch_X)
         batch_X = self.__update_batch(batch_X)
-        # batch_X = torch.from_numpy(batch_X)
-        # if self.MLP:
-        # prob_predictions, representations =  self.network(batch_X.float())#.squeeze()
-        # if len(inverse_data_covariance) == 0:
         prob_predictions, _ = self.network(
             batch_X.float(),
             inverse_data_covariance=inverse_data_covariance,
             alpha=self.alpha,
         )  # .squeeze()
-        # prob_predictions = torch.squeeze(prob_predictions)
-        # prob_predictions, _  =  self.network(batch_X.float())#.squeeze()
-
         return torch.squeeze(prob_predictions)
-        # else:
-
-        #   if len(inverse_data_covariance) == 0:
-        #     return self.__sigmoid(torch.mv(batch_X.float(), self.theta))#.numpy()
-        #   else:
-        #     ### adjust this using the inverse_data_covariance
-        #     ### for each datapoint return the max
-        #     return self.__sigmoid(torch.mv(batch_X.float(), self.theta) + torch.from_numpy(self.alpha*self.__inverse_covariance_norm(batch_X, inverse_data_covariance)))#.numpy()
 
     def get_predictions(self, batch_X, threshold, inverse_data_covariance=[]):
-        # if self.MLP:
-        #   #self.network.eval()
-        #   prob_predictions =  self.network(batch_X.float())
-        # else:
         prob_predictions = self.predict_prob(batch_X, inverse_data_covariance)
         thresholded_predictions = prob_predictions > threshold
-        # TODO: needed?
-        # thresholded_predictions = torch.squeeze(thresholded_predictions)
-        # thresholded_predictions = thresholded_predictions.cpu().numpy()
         return thresholded_predictions
 
     def get_accuracy(self, batch_X, batch_y, threshold, inverse_data_covariance=[]):
@@ -274,9 +251,6 @@ class TorchBinaryLogisticRegression:
 
 def get_predictions(global_batch, protected_batches, model, inverse_data_covariance=[]):
     batch_X, batch_y = global_batch
-    # logistic_loss = model.get_loss( batch_X, batch_y)
-    # logistic_gradient = model.get_gradient(batch_X, batch_y)
-
     protected_predictions = [
         model.predict_prob(protected_batch[0], inverse_data_covariance)
         for protected_batch in protected_batches
