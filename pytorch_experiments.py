@@ -12,14 +12,14 @@ from typing import Any
 
 
 # USE_RAY = True
+# NUM_EXPERIMENTS = 5
 USE_RAY = False
+NUM_EXPERIMENTS = 1
 
 LINEWIDTH = 3.5
 LINESTYLE = "dashed"
 STD_GAP = 0.5
 ALPHA = 0.1
-# NUM_EXPERIMENTS = 5
-NUM_EXPERIMENTS = 1
 
 
 @dataclass
@@ -632,13 +632,20 @@ def run_and_plot(
         open("{}/{}.p".format(base_data_directory, "data_dump"), "wb"),
     )
     # print(f"FPR and FNR: {experiment_summaries[-1][-1]}")
-    train_breakdown = experiment_summaries[-2]
-    test_breakdown = experiment_summaries[-1]
+    train_breakdowns = []
+    test_breakdowns = []
+    for summary in experiment_summaries:
+        train_breakdowns.append(summary[-2])
+        test_breakdowns.append(summary[-1])
+    print("train_breakdowns")
+    print(train_breakdowns)
+    print("test_breakdowns")
+    print(test_breakdowns)
     pickle.dump(
         # FPR/FNR
         (
-            train_breakdown,
-            test_breakdown,
+            train_breakdowns,
+            test_breakdowns,
         ),
         open("{}/{}.p".format(base_data_directory, "fnr_dump"), "wb"),
     )
@@ -648,19 +655,20 @@ def run_and_plot(
 
 
 if __name__ == "__main__":
-    # dataset = "Adult"
+    dataset = "Adult"
     # dataset = "MultiSVM"
-    dataset = "MNIST"
+    # dataset = "MNIST"
     training_mode = "full_minimization"
     nn_params = NNParams()
     nn_params.max_num_steps = 2
-    nn_params.baseline_steps = 3
-    nn_params.batch_size = 1
+    nn_params.baseline_steps = 100
+    # nn_params.batch_size = 1
+    nn_params.batch_size = 32
     linear_model_hparams = LinearModelHparams()
     exploration_hparams = ExplorationHparams()
-    exploration_hparams.decision_type = "simple"
-    exploration_hparams.epsilon_greedy = False
-    # exploration_hparams.decision_type = "counterfactual"
+    # exploration_hparams.decision_type = "simple"
+    # exploration_hparams.epsilon_greedy = False
+    exploration_hparams.decision_type = "counterfactual"
     # exploration_hparams.loss_confidence_band = 0
     # TODO
     logging_frequency = 1
