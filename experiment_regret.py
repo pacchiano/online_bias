@@ -11,6 +11,8 @@ from models import (
     get_error_breakdown
 )
 
+FIXED_STEPS = True
+
 
 def train_model(
     model,
@@ -485,9 +487,11 @@ def run_regret_experiment_pytorch(
     train_accuracies_biased = []
     timesteps = []
 
-    if training_mode == "full_minimization":
-        biased_dataset = GrowingNumpyDataSet()
-        unbiased_dataset = GrowingNumpyDataSet()
+    # if training_mode == "full_minimization":
+    #     biased_dataset = GrowingNumpyDataSet()
+    #     unbiased_dataset = GrowingNumpyDataSet()
+    biased_dataset = GrowingNumpyDataSet()
+    unbiased_dataset = GrowingNumpyDataSet()
 
     while counter < nn_params.max_num_steps:
         counter += 1
@@ -515,15 +519,23 @@ def run_regret_experiment_pytorch(
                 "Start of full minimization training of the unbiased model -- timestep ",
                 counter,
             )
-            model = train_model_with_stopping(
-                model,
-                num_full_minimization_steps,
-                unbiased_dataset,
-                nn_params.batch_size,
-                verbose=verbose,
-                restart_model_full_minimization=nn_params.restart_model_full_minimization,
-                eps=0.0001 * np.log(counter + 2) / 2,
-            )
+            if FIXED_STEPS:
+                model = train_model(
+                    model,
+                    num_full_minimization_steps,
+                    unbiased_dataset,
+                    nn_params.batch_size,
+                )
+            else:
+                model = train_model_with_stopping(
+                    model,
+                    num_full_minimization_steps,
+                    unbiased_dataset,
+                    nn_params.batch_size,
+                    verbose=verbose,
+                    restart_model_full_minimization=nn_params.restart_model_full_minimization,
+                    eps=0.0001 * np.log(counter + 2) / 2,
+                )
             gc.collect()
 
         elif training_mode == "gradient_step":
@@ -532,6 +544,12 @@ def run_regret_experiment_pytorch(
             )
 
         if exploration_hparams.decision_type == "simple":
+            # global_biased_prediction, protected_biased_predictions = get_predictions(
+            #     global_batch,
+            #     protected_batches,
+            #     model_biased,
+            #     inverse_cummulative_data_covariance,
+            # )
             if biased_dataset.get_size() == 0:
                 # ACCEPT ALL POINTS IF THE BIASED DATASET IS NOT INITIALIZED
                 global_biased_prediction = [1 for _ in range(nn_params.batch_size)]
@@ -785,16 +803,24 @@ def pseudolabel(
     pseudo_Y = torch.ones(batch_X.shape[0]).to('cuda')
     for x in range(upweight):
         train_dataset.add_data(batch_X, pseudo_Y)
-    model = train_model_with_stopping(
-        model,
-        nn_params.num_full_minimization_steps,
-        train_dataset,
-        nn_params.batch_size,
-        verbose=verbose,
-        restart_model_full_minimization=nn_params.restart_model_full_minimization,
-        eps=eps,
-        weight_decay=nn_params.weight_decay
-    )
+    if FIXED_STEPS:
+        model = train_model(
+            model,
+            nn_params.num_full_minimization_steps,
+            train_dataset,
+            nn_params.batch_size,
+        )
+    else:
+        model = train_model_with_stopping(
+            model,
+            nn_params.num_full_minimization_steps,
+            train_dataset,
+            nn_params.batch_size,
+            verbose=verbose,
+            restart_model_full_minimization=nn_params.restart_model_full_minimization,
+            eps=eps,
+            weight_decay=nn_params.weight_decay
+        )
     train_dataset.pop_last_data()
     global_biased_prediction, _ = get_predictions(
         test_batch, protected_batches_test, model

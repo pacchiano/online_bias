@@ -21,8 +21,18 @@ PARALLEL = True
 FAST = False
 T = 300
 BATCH = 32
+# Eps
 EPS_GREEDY = True
 GREEDY = False
+
+# Greed
+# EPS_GREEDY = False
+# GREEDY = True
+
+# pseudo
+# EPS_GREEDY = False
+# GREEDY = True
+
 METHOD = "pseudolabel_"
 if EPS_GREEDY:
     METHOD = "eps_greedy_"
@@ -30,7 +40,7 @@ if GREEDY:
     METHOD = "greedy_"
 # DECAY = 0.001
 DECAY = 0.0
-VERSION = f"_{T}t_{METHOD}ray_no_warm_batch_{BATCH}_decay_{DECAY}_gpu"
+VERSION = f"_{T}t_{METHOD}decay_{DECAY}"
 JOB_PREFIX = "fair_bandits_test"
 PARALLEL_STR = "_parallel" if PARALLEL else ""
 JOB_NAME = f"{JOB_PREFIX}{PARALLEL_STR}_{VERSION}"
@@ -105,7 +115,7 @@ def get_parallel_args():
     ]
 
 
-working_directory = "/checkpoint/apacchiano/"
+working_directory = "/checkpoint/apacchiano/fast"
 partition = "prioritylab"
 gpus_per_node = 5
 ntasks_per_node = 1

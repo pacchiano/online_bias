@@ -572,6 +572,8 @@ def run_and_plot(
 ):
     # TODO?
     if USE_RAY:
+        # 50 GB
+        # ray.init(object_store_memory=500**9)
         ray.init()
     start_time = time.time()
     linear = False
@@ -659,8 +661,9 @@ if __name__ == "__main__":
     # dataset = "MultiSVM"
     # dataset = "MNIST"
     training_mode = "full_minimization"
+    # training_mode = "gradient_step"
     nn_params = NNParams()
-    nn_params.max_num_steps = 2
+    nn_params.max_num_steps = 20
     nn_params.baseline_steps = 100
     # nn_params.batch_size = 1
     nn_params.batch_size = 32
