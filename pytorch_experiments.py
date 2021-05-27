@@ -29,7 +29,7 @@ class NNParams:
     baseline_steps = 10000
     batch_size = 32
     num_full_minimization_steps = 100
-    psuedo_steps_multiplier = 4
+    pseudo_steps_multiplier = 8
     random_init = True
     restart_model_full_minimization = True
     weight_decay = 0.0
@@ -51,8 +51,8 @@ class ExplorationHparams:
     # mahalanobis_reguarizers = [0.1]
     # epsilons = [0.1, 0.2, 0.5]
     # alphas = [1, 4]
-    mahalanobis_discount_factors = 1
-    mahalanobis_reguarizers = 0.1
+    mahalanobis_discount_factor = 1
+    mahalanobis_regularizer = 0.1
     epsilon = 0.1
     alpha = 1
     decision_type = "counterfactual"
@@ -91,7 +91,8 @@ def conditionally(dec, cond):
     return resdec
 
 
-@conditionally(ray.remote(num_gpus=NUM_EXPERIMENTS), USE_RAY)
+@conditionally(ray.remote(num_gpus=1), USE_RAY)
+# @conditionally(ray.remote(num_gpus=1), USE_RAY)
 def run_experiment_parallel(
     dataset,
     training_mode,
@@ -111,7 +112,9 @@ def run_experiment_parallel(
         loss_baseline,
         baseline_accuracy,
         train_error_breakdown,
-        test_error_breakdown
+        test_error_breakdown,
+        pseudo_error_breakdown,
+        eps_error_breakdown
     ) = run_regret_experiment_pytorch(
         dataset,
         training_mode,
@@ -131,7 +134,9 @@ def run_experiment_parallel(
         loss_baseline,
         baseline_accuracy,
         train_error_breakdown,
-        test_error_breakdown
+        test_error_breakdown,
+        pseudo_error_breakdown,
+        eps_error_breakdown
     )
 
 
@@ -640,18 +645,28 @@ def run_and_plot(
     # print(f"FPR and FNR: {experiment_summaries[-1][-1]}")
     train_breakdowns = []
     test_breakdowns = []
+    pseudo_breakdowns = []
+    eps_breakdowns = []
     for summary in experiment_summaries:
-        train_breakdowns.append(summary[-2])
-        test_breakdowns.append(summary[-1])
+        train_breakdowns.append(summary[-4])
+        test_breakdowns.append(summary[-3])
+        pseudo_breakdowns.append(summary[-2])
+        eps_breakdowns.append(summary[-1])
     print("train_breakdowns")
     print(train_breakdowns)
     print("test_breakdowns")
     print(test_breakdowns)
+    print("pseudo breakdowns")
+    print(pseudo_breakdowns)
+    print("eps breakdowns")
+    print(eps_breakdowns)
     pickle.dump(
         # FPR/FNR
         (
             train_breakdowns,
             test_breakdowns,
+            pseudo_breakdowns,
+            eps_breakdowns
         ),
         open("{}/{}.p".format(base_data_directory, "fnr_dump"), "wb"),
     )
@@ -661,25 +676,43 @@ def run_and_plot(
 
 
 if __name__ == "__main__":
-    # dataset = "Adult"
+    dataset = "Adult"
     # dataset = "MultiSVM"
-    dataset = "MNIST"
+    # dataset = "MNIST"
+<<<<<<< gpu
+    dataset = "Bank"
     training_mode = "full_minimization"
-    # training_mode = "gradient_step"
     nn_params = NNParams()
-    nn_params.max_num_steps = 300
+    nn_params.max_num_steps = 5
+    # nn_params.max_num_steps = 100
+    # nn_params.max_num_steps = 500
+    # nn_params.max_num_steps = 2
+    # nn_params.max_num_steps = 2000
+    nn_params.baseline_steps = 100
+=======
+    training_mode = "full_minimization"
+    nn_params = NNParams()
+    # nn_params.max_num_steps = 10
+    nn_params.max_num_steps = 500
+    # nn_params.max_num_steps = 500
+    # nn_params.max_num_steps = 2
+    # nn_params.max_num_steps = 2000
     nn_params.baseline_steps = 10000
-    # nn_params.batch_size = 1
+>>>>>>> local
+    # nn_params.baseline_steps = 24_000
     nn_params.batch_size = 32
+    # nn_params.batch_size = 1
     linear_model_hparams = LinearModelHparams()
     exploration_hparams = ExplorationHparams()
     exploration_hparams.decision_type = "simple"
+    exploration_hparams.adjust_mahalanobis = True
     # exploration_hparams.epsilon_greedy = True
+    # exploration_hparams.epsilon = 0.1
     exploration_hparams.epsilon_greedy = False
     # exploration_hparams.decision_type = "counterfactual"
-    # exploration_hparams.loss_confidence_band = 0
     # TODO
-    logging_frequency = 10
+    # logging_frequency = 10
+    logging_frequency = 2
     run_and_plot(
         dataset,
         training_mode,

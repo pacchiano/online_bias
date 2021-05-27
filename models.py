@@ -48,7 +48,7 @@ class Feedforward(torch.nn.Module):
             output = torch.squeeze(output) + alpha * torch.sqrt(
                 torch.matmul(
                     representation,
-                    torch.matmul(inverse_data_covariance.float(), representation.t()),
+                    torch.matmul(inverse_data_covariance.float().to('cuda'), representation.t()),
                 ).diag()
             )
 
@@ -233,6 +233,32 @@ class TorchBinaryLogisticRegression:
             norm = (torch.linalg.norm(self.network.fc1.weight) + torch.linalg.norm(self.network.fc2.weight)).item()
         return Breakdown(false_positive.mean(), false_negative.mean(), norm)
 
+    def get_special_breakdown(self, batch_X, batch_y, threshold, inverse_data_covariance=[]):
+        true_pos = torch.nonzero(batch_y == 1).squeeze(dim=1)
+        true_negs = torch.nonzero(batch_y == 0).squeeze(dim=1)
+        # TODO
+        # pos_accept = torch.tensor(10.0)
+        # neg_accept = torch.tensor(-10.0)
+        pos_predictions = []
+        neg_predictions = []
+        if len(true_pos) > 0:
+            pos_predictions = self.get_predictions(
+                batch_X[true_pos], threshold, inverse_data_covariance
+            ).float()
+            # pos_accept = pos_predictions.mean()
+        if len(true_negs) > 0:
+            neg_predictions = self.get_predictions(
+                batch_X[true_negs], threshold, inverse_data_covariance
+            ).float()
+            # neg_accept = neg_predictions.mean()
+        # return pos_accept, neg_accept
+        n_accepts_pos = 0 if len(true_pos) == 0 else torch.nonzero(pos_predictions == 1).size()[0]
+        n_accepts_neg = 0 if len(true_negs) == 0 else torch.nonzero(neg_predictions == 1).size()[0]
+        return [
+            (n_accepts_pos, len(true_pos)),
+            (n_accepts_neg, len(true_negs)),
+        ]
+
     def plot(self, x_min, x_max, num_points=100):
         x_space = np.linspace(x_min, x_max, num_points)
         y_values = []
@@ -262,6 +288,22 @@ def get_predictions(global_batch, protected_batches, model, inverse_data_covaria
 def get_error_breakdown(global_batch, model, threshold):
     batch_X, batch_y = global_batch
     breakdown = model.get_breakdown(batch_X, batch_y, threshold)
+    return breakdown
+
+
+# def get_breakdown_no_model(self, batch, preds):
+def get_breakdown_no_model(batch):
+    # False Positive
+    batch_X, batch_y = batch
+    preds = torch.ones_like(batch_y)
+    false_positive = torch.bitwise_and(preds == 1, batch_y == 0).float()
+    false_negative = torch.bitwise_and(preds == 0, batch_y == 1).float()
+    return Breakdown(false_positive.mean(), false_negative.mean(), 0)
+
+
+def get_special_breakdown(batch, model, threshold):
+    batch_X, batch_y = batch
+    breakdown = model.get_special_breakdown(batch_X, batch_y, threshold)
     return breakdown
 
 

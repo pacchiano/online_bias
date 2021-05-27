@@ -17,32 +17,44 @@ from pytorch_experiments import (
 
 PARALLEL = True
 # FAST = True
-# VERSION = "fast_ray_distr"
 FAST = False
-T = 500
+T = 2000
 BATCH = 32
+EPS = 0.2
+
+# Mahlanobis
+# EPS_GREEDY = False
+# GREEDY = False
+# MAHL = True
 
 # Eps
 # EPS_GREEDY = True
 # GREEDY = False
+# MAHL = False
 
 # Greed
 # EPS_GREEDY = False
 # GREEDY = True
+# MAHL = False
 
 # pseudo
 EPS_GREEDY = False
 GREEDY = False
+MAHL = False
+
+# DECAY = 0.1
+# DECAY = 0.0001
+DECAY = 0.05
 
 METHOD = "pseudolabel_"
 if EPS_GREEDY:
-    METHOD = "eps_greedy_"
+    METHOD = f"eps_greedy_schedule_{EPS}_"
 if GREEDY:
-    METHOD = "greedy_"
-DECAY = 0.1
-# DECAY = 0.0
-VERSION = f"_{T}t_{METHOD}decay_{DECAY}"
-JOB_PREFIX = "fair_bandits_test"
+    METHOD = "greedy_bad_"
+if MAHL:
+    METHOD = "mahlanobis_alpha_4_"
+VERSION = f"_{T}t_{METHOD}decay_{DECAY}_multi_exp_more_logs_v2"
+JOB_PREFIX = "exp_bank"
 PARALLEL_STR = "_parallel" if PARALLEL else ""
 JOB_NAME = f"{JOB_PREFIX}{PARALLEL_STR}_{VERSION}"
 
@@ -81,13 +93,13 @@ def copy_and_run_with_config(
 
 
 def get_parallel_args():
-    datasets = ["MultiSVM", "Adult", "MNIST"]
+    datasets = ["MultiSVM", "Adult", "MNIST", "Bank"]
     training_modes = ["full_minimization"] * len(datasets)
     nn_params = NNParams()
     # Fairly fast, decent capacity.
     # [10, 40, 100]
     nn_params.representation_layer_size = 40
-    nn_param_list = [nn_params] * 3
+    nn_param_list = [nn_params] * len(datasets)
     for nn_param in nn_param_list:
         # [30, 100, 1000]
         if FAST:
@@ -99,24 +111,32 @@ def get_parallel_args():
             nn_param.max_num_steps = T
             nn_param.batch_size = BATCH
             nn_param.weight_decay = DECAY
+            nn_param.baseline_steps = 20_000
     linear_model_hparams = [LinearModelHparams()] * len(datasets)
     exploration_hparam = ExplorationHparams()
     if EPS_GREEDY:
         exploration_hparam.decision_type = "simple"
         exploration_hparam.epsilon_greedy = True
+        exploration_hparam.epsilon = EPS
     elif GREEDY:
         exploration_hparam.decision_type = "simple"
         exploration_hparam.epsilon_greedy = False
+    elif MAHL:
+        exploration_hparam.decision_type = "simple"
+        exploration_hparam.adjust_mahalanobis = True
+        exploration_hparam.mahalanobis_discount_factor = 0.9
+        exploration_hparam.alpha = 4
     exploration_hparams = [exploration_hparam] * len(datasets)
     num_experiments = [NUM_EXPERIMENTS] * len(datasets)
-    logging_frequency = [int(T / 5)] * len(datasets)
+    # logging_frequency = [50] * len(datasets)
+    logging_frequency = [10] * len(datasets)
     return [
         datasets, training_modes, nn_param_list, linear_model_hparams,
-        exploration_hparams, num_experiments, logging_frequency
+        exploration_hparams, logging_frequency, num_experiments
     ]
 
 
-working_directory = "/checkpoint/apacchiano/fast"
+working_directory = "/checkpoint/apacchiano/final_results/bank"
 # partition = "devlab"
 # partition = "prioritylab"
 # partition = "learnfair"

@@ -8,7 +8,9 @@ from models import (
     get_predictions,
     get_accuracies,
     get_accuracies_simple,
-    get_error_breakdown
+    get_breakdown_no_model,
+    get_error_breakdown,
+    get_special_breakdown
 )
 
 FIXED_STEPS = True
@@ -28,6 +30,7 @@ def train_model(
             print("train model iteration ", i)
         batch_X, batch_y = train_dataset.get_batch(batch_size)
         if i == 0:
+            # TODO
             restart_model_full_minimization = False
             if restart_model_full_minimization:
                 # print("Batch X: ")
@@ -451,6 +454,8 @@ def run_regret_experiment_pytorch(
 
     accuracies_list = []
     biased_accuracies_list = []
+    pseudo_error_breakdown_list = []
+    eps_error_breakdown_list = []
     train_error_breakdown_list = []
     test_error_breakdown_list = []
     loss_validation = []
@@ -523,6 +528,15 @@ def run_regret_experiment_pytorch(
                 counter,
             )
             if FIXED_STEPS:
+<<<<<<< gpu
+=======
+                total_size = unbiased_dataset.get_size()
+                batches = total_size / nn_params.batch_size
+                print("unibased dataset")
+                print("Training batches")
+                print(batches)
+                num_full_minimization_steps = batches
+>>>>>>> local
                 model = train_model(
                     model,
                     num_full_minimization_steps,
@@ -547,22 +561,22 @@ def run_regret_experiment_pytorch(
             )
 
         if exploration_hparams.decision_type == "simple":
-            # global_biased_prediction, protected_biased_predictions = get_predictions(
-            #     global_batch,
-            #     protected_batches,
-            #     model_biased,
-            #     inverse_cummulative_data_covariance,
-            # )
-            if biased_dataset.get_size() == 0:
-                # ACCEPT ALL POINTS IF THE BIASED DATASET IS NOT INITIALIZED
-                global_biased_prediction = [1 for _ in range(nn_params.batch_size)]
-            else:
-                global_biased_prediction, protected_biased_predictions = get_predictions(
-                    global_batch,
-                    protected_batches,
-                    model_biased,
-                    inverse_cummulative_data_covariance,
-                )
+            global_biased_prediction, protected_biased_predictions = get_predictions(
+                global_batch,
+                protected_batches,
+                model_biased,
+                inverse_cummulative_data_covariance,
+            )
+            # if biased_dataset.get_size() == 0:
+            #     # ACCEPT ALL POINTS IF THE BIASED DATASET IS NOT INITIALIZED
+            #     global_biased_prediction = [1 for _ in range(nn_params.batch_size)]
+            # else:
+            #     global_biased_prediction, protected_biased_predictions = get_predictions(
+            #         global_batch,
+            #         protected_batches,
+            #         model_biased,
+            #         inverse_cummulative_data_covariance,
+            #     )
 
         elif exploration_hparams.decision_type == "counterfactual":
             print(f"Training mode: {training_mode}")
@@ -613,6 +627,36 @@ def run_regret_experiment_pytorch(
                         protected_batches_test=protected_batches,  # meaningless
                         train_dataset=biased_dataset,
                     )
+                    if counter % logging_frequency * 1.0 == 0:
+                        # TODO: p(accept|positive), p(accept|negative)
+                        # pseudo_breakdown = get_error_breakdown(
+                        #     pseudo_batch,
+                        #     model_biased_prediction,
+                        #     linear_model_hparams.threshold,
+                        # )
+                        # eval_neg = initial_biased_pred < linear_model_hparams.biased_threshold
+                        # neg_indices = torch.nonzero(eval_neg).squeeze(dim=1)
+                        # # create pseudo batch from random decision indices.
+                        # pseudo_batch = (
+                        #     global_batch[0][neg_indices],
+                        #     global_batch[1][neg_indices]
+                        # )
+                        pseudo_breakdown = get_special_breakdown(
+                            pseudo_batch,
+                            model_biased_prediction,
+                            linear_model_hparams.threshold,
+                        )
+                        eps_breakdown = get_breakdown_no_model(
+                            pseudo_batch,
+                        )
+                        pseudo_error_breakdown_list.append(pseudo_breakdown)
+                        eps_error_breakdown_list.append(eps_breakdown)
+                        # print("Pseudo Pred")
+                        # print(pseudo_pred)
+                        # print("Pseudo Breakdown")
+                        # print(pseudo_breakdown)
+                        # print("Eps Breakdown")
+                        # print(eps_breakdown)
                     global_biased_prediction[random_indices] = pseudo_pred
 
         biased_batch_X = []
@@ -631,7 +675,7 @@ def run_regret_experiment_pytorch(
             label = batch_y[i]
             accuracy, regret, accepted = process_prediction(
                 global_biased_prediction[i], label, linear_model_hparams,
-                exploration_hparams, regret_wrt_baseline, baseline_accuracy
+                exploration_hparams, regret_wrt_baseline, baseline_accuracy, counter
             )
             biased_train_accuracy += accuracy
             batch_regret += regret
@@ -815,6 +859,8 @@ def run_regret_experiment_pytorch(
         baseline_accuracy,
         train_error_breakdown_list,
         test_error_breakdown_list,
+        pseudo_error_breakdown_list,
+        eps_error_breakdown_list
     )
 
 
@@ -855,12 +901,24 @@ def pseudolabel(
 def process_prediction(
     global_biased_prediction, label,
     linear_model_hparams, exploration_hparams,
-    regret_wrt_baseline, baseline_accuracy
+    regret_wrt_baseline, baseline_accuracy, t
 ):
-    accept_point = global_biased_prediction > linear_model_hparams.biased_threshold or (
-        exploration_hparams.epsilon_greedy
-        and np.random.random() < exploration_hparams.epsilon
-    )
+    # Decay epsilon for EG.
+    if exploration_hparams.epsilon_greedy:
+        # Cheating ofc.
+        epsilon = exploration_hparams.epsilon - ((exploration_hparams.epsilon - 0.01) * (t / 2000))
+        accept_point = global_biased_prediction > linear_model_hparams.biased_threshold or (
+            exploration_hparams.epsilon_greedy
+            and np.random.random() < epsilon
+        )
+    # Don't decay otherwise.
+    else:
+        accept_point = global_biased_prediction > linear_model_hparams.biased_threshold or (
+            exploration_hparams.epsilon_greedy
+            and np.random.random() < exploration_hparams.epsilon
+        )
+    # TODO: Get the false positive/fnr for the eps greedy points.
+    # if exploration_hparams.epsilon_greedy:
 
     # biased_train_accuracy += (accept_point == batch_y[i]) * 1.0
     if regret_wrt_baseline:
