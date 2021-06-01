@@ -10,7 +10,7 @@ sys.path.append(
 from pytorch_experiments import ExperimentResults
 
 
-datasets = ["Adult", "Bank", "MNIST"]
+datasets = ["Adult", "Bank", "MNIST", "MultiSVM"]
 results = pd.DataFrame(columns=["Exp", "Dataset", "Regret", "Regret_STD"])
 for exp in os.listdir():
     for dataset in datasets:

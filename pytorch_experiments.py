@@ -46,17 +46,11 @@ class LinearModelHparams:
 
 @dataclass
 class ExplorationHparams:
-    # TODO: initial sweep values.
-    # mahalanobis_discount_factors = [1, 0.9, 0.8]
-    # mahalanobis_reguarizers = [0.1]
-    # epsilons = [0.1, 0.2, 0.5]
-    # alphas = [1, 4]
     mahalanobis_discount_factor = 1
     mahalanobis_regularizer = 0.1
     epsilon = 0.1
     alpha = 1
     decision_type = "counterfactual"
-    # TODO
     epsilon_greedy = False
     adjust_mahalanobis = False
     loss_confidence_band = None
@@ -145,12 +139,6 @@ def configure_directories(dataset, nn_params, linear):
     network_type = (
         "Linear{}".format(nn_params.representation_layer_size) if linear else "MLP"
     )
-    # base_data_directory = "{}/experiment_results/{}/{}/{}/data".format(
-    #     path, nn_params.max_num_steps, network_type, dataset
-    # )
-    # base_figs_directory = "{}/experiment_results/T{}/{}/{}/figs".format(
-    #     path, nn_params.max_num_steps, network_type, dataset
-    # )
     base_data_directory = "{}/experiment_results/{}/data".format(
         path, dataset
     )
@@ -211,17 +199,6 @@ def run_experiments(
             )
             for _ in range(num_experiments)
         ]
-    # experiment_summaries = [
-    #     run_experiment_parallel(
-    #         dataset,
-    #         training_mode,
-    #         nn_params,
-    #         linear_model_hparams,
-    #         exploration_hparams,
-    #         logging_frequency,
-    #     )
-    #     for _ in range(num_experiments)
-    # ]
     return experiment_summaries
 
 
@@ -327,11 +304,6 @@ def plot_helper(timesteps, accuracies, accuracies_stds, label, color, broadcast=
     if broadcast:
         accuracies = np.array([accuracies] * len(timesteps))
         accuracies_stds = np.array([accuracies_stds] * len(timesteps))
-    # print("INSIDE PLOT HELPER")
-    # print(f"Timesteps: {timesteps}")
-    # print(f"Type Timesteps: {type(timesteps)}")
-    # print(f"Accuracies: {accuracies}")
-    # print(f"type Accuracies: {type(accuracies)}")
     plt.plot(
         timesteps,
         accuracies,
@@ -457,7 +429,6 @@ def plot_results(
         "Biased Model Test - no decision adjustment",
         "blue",
     )
-    # TODO: is this on test set or train set?
     plot_helper(
         timesteps,
         experiment_results.mean_accuracies_cum_averages,
@@ -465,7 +436,6 @@ def plot_results(
         label="Unbiased Model Test - all data train",
         color="red",
     )
-    # TODO: this looks like the right dataset, why does it seem buggy?
     plot_helper(
         timesteps,
         experiment_results.mean_train_biased_accuracies_cum_averages,
@@ -576,10 +546,7 @@ def run_and_plot(
     logging_frequency,
     num_experiments,
 ):
-    # TODO?
     if USE_RAY:
-        # 50 GB
-        # ray.init(object_store_memory=500**9)
         ray.init()
     start_time = time.time()
     linear = False
@@ -627,22 +594,9 @@ def run_and_plot(
             timesteps,
             nn_params.max_num_steps,
             experiment_results,
-            # experiment_results.mean_test_biased_accuracies_cum_averages,  # 2
-            # experiment_results.std_test_biased_accuracies_cum_averages,
-            # experiment_results.mean_accuracies_cum_averages,  # 4
-            # experiment_results.std_accuracies_cum_averages,
-            # experiment_results.mean_train_biased_accuracies_cum_averages,  # 6
-            # experiment_results.std_train_biased_accuracies_cum_averages,
-            # experiment_results.mean_loss_validation_averages,  # 8
-            # experiment_results.std_loss_validation_averages,
-            # experiment_results.mean_loss_validation_biased_averages,  # 10
-            # experiment_results.std_loss_validation_biased_averages,
-            # experiment_results.mean_train_cum_regret_averages,  # 12
-            # experiment_results.std_train_cum_regret_averages,
         ),
         open("{}/{}.p".format(base_data_directory, "data_dump"), "wb"),
     )
-    # print(f"FPR and FNR: {experiment_summaries[-1][-1]}")
     train_breakdowns = []
     test_breakdowns = []
     pseudo_breakdowns = []
@@ -652,14 +606,14 @@ def run_and_plot(
         test_breakdowns.append(summary[-3])
         pseudo_breakdowns.append(summary[-2])
         eps_breakdowns.append(summary[-1])
-    print("train_breakdowns")
-    print(train_breakdowns)
-    print("test_breakdowns")
-    print(test_breakdowns)
-    print("pseudo breakdowns")
-    print(pseudo_breakdowns)
-    print("eps breakdowns")
-    print(eps_breakdowns)
+    # print("Train Breakdowns")
+    # print(train_breakdowns)
+    # print("Test Breakdowns")
+    # print(test_breakdowns)
+    # print("Pseudo Breakdowns")
+    # print(pseudo_breakdowns)
+    # print("Eps Breakdowns")
+    # print(eps_breakdowns)
     pickle.dump(
         # FPR/FNR
         (
@@ -677,28 +631,15 @@ def run_and_plot(
 
 if __name__ == "__main__":
     dataset = "Adult"
+    # dataset = "Bank"
     # dataset = "MultiSVM"
     # dataset = "MNIST"
-<<<<<<< gpu
-    dataset = "Bank"
     training_mode = "full_minimization"
     nn_params = NNParams()
-    nn_params.max_num_steps = 5
-    # nn_params.max_num_steps = 100
-    # nn_params.max_num_steps = 500
-    # nn_params.max_num_steps = 2
+    nn_params.max_num_steps = 20
     # nn_params.max_num_steps = 2000
     nn_params.baseline_steps = 100
-=======
-    training_mode = "full_minimization"
-    nn_params = NNParams()
-    # nn_params.max_num_steps = 10
-    nn_params.max_num_steps = 500
-    # nn_params.max_num_steps = 500
-    # nn_params.max_num_steps = 2
-    # nn_params.max_num_steps = 2000
-    nn_params.baseline_steps = 10000
->>>>>>> local
+    # nn_params.baseline_steps = 10000
     # nn_params.baseline_steps = 24_000
     nn_params.batch_size = 32
     # nn_params.batch_size = 1

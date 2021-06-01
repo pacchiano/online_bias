@@ -23,9 +23,9 @@ BATCH = 32
 EPS = 0.2
 
 # Mahlanobis
-# EPS_GREEDY = False
-# GREEDY = False
-# MAHL = True
+EPS_GREEDY = False
+GREEDY = False
+MAHL = True
 
 # Eps
 # EPS_GREEDY = True
@@ -38,9 +38,9 @@ EPS = 0.2
 # MAHL = False
 
 # pseudo
-EPS_GREEDY = False
-GREEDY = False
-MAHL = False
+# EPS_GREEDY = False
+# GREEDY = False
+# MAHL = False
 
 # DECAY = 0.1
 # DECAY = 0.0001
@@ -52,7 +52,7 @@ if EPS_GREEDY:
 if GREEDY:
     METHOD = "greedy_bad_"
 if MAHL:
-    METHOD = "mahlanobis_alpha_4_"
+    METHOD = "mahlanobis_alpha_4_rerun"
 VERSION = f"_{T}t_{METHOD}decay_{DECAY}_multi_exp_more_logs_v2"
 JOB_PREFIX = "exp_bank"
 PARALLEL_STR = "_parallel" if PARALLEL else ""
@@ -128,7 +128,6 @@ def get_parallel_args():
         exploration_hparam.alpha = 4
     exploration_hparams = [exploration_hparam] * len(datasets)
     num_experiments = [NUM_EXPERIMENTS] * len(datasets)
-    # logging_frequency = [50] * len(datasets)
     logging_frequency = [10] * len(datasets)
     return [
         datasets, training_modes, nn_param_list, linear_model_hparams,
@@ -143,10 +142,6 @@ working_directory = "/checkpoint/apacchiano/final_results/bank"
 partition = "learnlab"
 gpus_per_node = 5
 ntasks_per_node = 1
-# ntasks_per_node = 5
-# TODO: not needed, this is only useful for distr.
-# nodes = 3
-# Job array can easily handle this.
 nodes = 1
 
 
@@ -165,7 +160,6 @@ copy_and_run_with_config(
     ntasks_per_node=ntasks_per_node,
     gpus_per_task=5,
     cpus_per_task=5,
-    # mem="470GB",
     mem="100GB",
     nodes=nodes,
     # constraint="volta32gb",

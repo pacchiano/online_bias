@@ -22,7 +22,8 @@ def process_results(data, label):
     #     print([y[0].cpu().item() for y in exp])
     #     print(f"{label} FnR")
     #     print([y[1].cpu().item() for y in exp])
-    print(data)
+    # print(data)
+    pass
 
 
 def process_results_plot(d):
@@ -48,7 +49,10 @@ def process_fnr():
     # test = x[1]
     # process_results(test, "Test")
     pseudo = x[2]
-    process_results(pseudo, "Pseudo")
+    import json
+    with open("tmp.json", "w") as f:
+        json.dump(pseudo, f)
+    # process_results(pseudo, "Pseudo")
 
 def plot_fnr():
     with open("fnr_dump.p", 'rb') as f:

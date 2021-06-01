@@ -86,7 +86,10 @@ class GrowingNumpyDataSet:
             self.dataset_Y = self.dataset_Y[: -self.last_data_addition]
 
     def get_batch(self, batch_size):
-        if self.dataset_X is None or batch_size > self.dataset_X.shape[0]:
+        if self.dataset_X is None:
+            X = torch.empty(0)
+            Y = torch.empty(0)
+        elif batch_size > self.dataset_X.shape[0]:
             X = self.dataset_X
             Y = self.dataset_Y
         else:
