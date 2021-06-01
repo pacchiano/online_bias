@@ -1,0 +1,44 @@
+Starting Experiment MNIST T2 full_minimization ExplorationHparams()
+Finished training baseline model
+Baseline model accuracy 0.9070000648498535
+Adding data to unbiased dataset
+From scratch
+shapes
+torch.Size([3, 784])
+torch.Size([3, 784])
+datasets
+tensor([[-0.4242, -0.4242, -0.4242,  ..., -0.4242, -0.4242, -0.4242],
+        [-0.4242, -0.4242, -0.4242,  ..., -0.4242, -0.4242, -0.4242],
+        [-0.4242, -0.4242, -0.4242,  ..., -0.4242, -0.4242, -0.4242]],
+       device='cuda:0')
+tensor([[-0.4242, -0.4242, -0.4242,  ..., -0.4242, -0.4242, -0.4242],
+        [-0.4242, -0.4242, -0.4242,  ..., -0.4242, -0.4242, -0.4242],
+        [-0.4242, -0.4242, -0.4242,  ..., -0.4242, -0.4242, -0.4242]],
+       device='cuda:0')
+torch.Size([3, 784])
+Start of full minimization training of the unbiased model -- timestep  1
+Training mode: full_minimization
+Adding data to biased dataset
+From scratch
+shapes
+torch.Size([3, 784])
+torch.Size([3, 784])
+datasets
+tensor([[-0.4242, -0.4242, -0.4242,  ..., -0.4242, -0.4242, -0.4242],
+        [-0.4242, -0.4242, -0.4242,  ..., -0.4242, -0.4242, -0.4242],
+        [-0.4242, -0.4242, -0.4242,  ..., -0.4242, -0.4242, -0.4242]],
+       device='cuda:0')
+tensor([[-0.4242, -0.4242, -0.4242,  ..., -0.4242, -0.4242, -0.4242],
+        [-0.4242, -0.4242, -0.4242,  ..., -0.4242, -0.4242, -0.4242],
+        [-0.4242, -0.4242, -0.4242,  ..., -0.4242, -0.4242, -0.4242]],
+       device='cuda:0')
+torch.Size([3, 784])
+Biased dataset: <datasets.GrowingNumpyDataSet object at 0x7f1ae9da1590>
+> /private/home/apacchiano/OnlineBias/models.py(260)get_breakdown()
+-> return Breakdown(false_positive.mean(), false_negative.mean(), norm)
+(Pdb) (Pdb) (Pdb) (Pdb) --KeyboardInterrupt--
+(Pdb) --KeyboardInterrupt--
+(Pdb) --KeyboardInterrupt--
+(Pdb) --KeyboardInterrupt--
+(Pdb) --KeyboardInterrupt--
+(Pdb) (Pdb) (Pdb) (Pdb) 

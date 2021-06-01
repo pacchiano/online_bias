@@ -8,8 +8,12 @@ from models import (
     get_predictions,
     get_accuracies,
     get_accuracies_simple,
-    get_error_breakdown
+    get_breakdown_no_model,
+    get_error_breakdown,
+    get_special_breakdown
 )
+
+FIXED_STEPS = True
 
 
 def train_model(
@@ -27,6 +31,8 @@ def train_model(
         # print(train_dataset)
         batch_X, batch_y = train_dataset.get_batch(batch_size)
         if i == 0:
+            # TODO
+            restart_model_full_minimization = False
             if restart_model_full_minimization:
                 # print("Batch X: ")
                 # print(batch_X.shape)
@@ -124,6 +130,7 @@ def train_model_with_stopping(
 
         total_num_steps += curr_epoch_size
 
+        # TODO: why?
         curr_epoch_size = 2 * curr_epoch_size
 
         curr_epoch_index += 1
@@ -133,6 +140,12 @@ def train_model_with_stopping(
             max_epochs += 1
             print("Minimization Expanded max epochs and expanded eps ")
 
+        # TODO: super expensive.
+        # Idea: train 5 models in parallel, look at min loss?
+        # doubling or not epochs...
+        # stop if within bound of previous?
+        # can check with self.
+        # might need to double bound/band
         if curr_epoch_index % max_epochs == 0:
             print(
                 "Curr epoch index ",
@@ -351,9 +364,13 @@ def run_regret_experiment_pytorch(
     verbose = False
     regret_wrt_baseline = exploration_hparams.regret_wrt_baseline
     num_full_minimization_steps = nn_params.num_full_minimization_steps
-    restart_model_full_minimization = nn_params.restart_model_full_minimization
-    estimate_loss_confidence_band = True
+    TEST_BATCH_SIZE = 1000
 
+    # TODO
+    if dataset == "MNIST" or dataset == "Adult":
+        baseline_batch_size = nn_params.batch_size
+    else:
+        baseline_batch_size = 10
     (
         protected_datasets_train,
         protected_datasets_test,
@@ -361,8 +378,8 @@ def run_regret_experiment_pytorch(
         test_dataset,
     ) = get_dataset(
         dataset=dataset,
-        batch_size=nn_params.batch_size,
-        test_batch_size=1000
+        batch_size=baseline_batch_size,
+        test_batch_size=TEST_BATCH_SIZE
     )
     baseline_model = TorchBinaryLogisticRegression(
         random_init=nn_params.random_init,
@@ -377,12 +394,10 @@ def run_regret_experiment_pytorch(
             raise ValueError(
                 "Decision type set to counterfactual, can't set exploration constants."
             )
-    # TODO
-    if dataset == "MNIST" or dataset == "Adult":
-        baseline_batch_size = nn_params.batch_size
-    else:
-        baseline_batch_size = 10
 
+    # TODO: kinda dumb
+    batch_X, batch_y = train_dataset.get_batch(baseline_batch_size)
+    baseline_model.initialize_model(batch_X.shape[1])
     baseline_model = train_model(
         baseline_model, nn_params.baseline_steps, train_dataset, baseline_batch_size
     )
@@ -390,7 +405,7 @@ def run_regret_experiment_pytorch(
 
     with torch.no_grad():
         baseline_batch_test, protected_batches_test = get_batches(
-            protected_datasets_test, test_dataset, 1000
+            protected_datasets_test, test_dataset, TEST_BATCH_SIZE
         )
         baseline_accuracy, _ = get_accuracies(
             baseline_batch_test,
@@ -406,6 +421,8 @@ def run_regret_experiment_pytorch(
 
     accuracies_list = []
     biased_accuracies_list = []
+    pseudo_error_breakdown_list = []
+    eps_error_breakdown_list = []
     train_error_breakdown_list = []
     test_error_breakdown_list = []
     loss_validation = []
@@ -445,9 +462,8 @@ def run_regret_experiment_pytorch(
     train_accuracies_biased = []
     timesteps = []
 
-    if training_mode == "full_minimization":
-        biased_dataset = GrowingNumpyDataSet()
-        unbiased_dataset = GrowingNumpyDataSet()
+    biased_dataset = GrowingNumpyDataSet()
+    unbiased_dataset = GrowingNumpyDataSet()
 
     while counter < nn_params.max_num_steps:
         counter += 1
@@ -475,15 +491,23 @@ def run_regret_experiment_pytorch(
                 "Start of full minimization training of the unbiased model -- timestep ",
                 counter,
             )
-            model = train_model_with_stopping(
-                model,
-                num_full_minimization_steps,
-                unbiased_dataset,
-                nn_params.batch_size,
-                verbose=verbose,
-                restart_model_full_minimization=nn_params.restart_model_full_minimization,
-                eps=0.0001 * np.log(counter + 2) / 2,
-            )
+            if FIXED_STEPS:
+                model = train_model(
+                    model,
+                    num_full_minimization_steps,
+                    unbiased_dataset,
+                    nn_params.batch_size,
+                )
+            else:
+                model = train_model_with_stopping(
+                    model,
+                    num_full_minimization_steps,
+                    unbiased_dataset,
+                    nn_params.batch_size,
+                    verbose=verbose,
+                    restart_model_full_minimization=nn_params.restart_model_full_minimization,
+                    eps=0.0001 * np.log(counter + 2) / 2,
+                )
             gc.collect()
 
         elif training_mode == "gradient_step":
@@ -492,13 +516,22 @@ def run_regret_experiment_pytorch(
             )
 
         if exploration_hparams.decision_type == "simple":
-            # Training biased model
-            global_biased_prediction, protected_biased_predictions = get_predictions(
-                global_batch,
-                protected_batches,
-                model_biased,
-                inverse_cummulative_data_covariance,
-            )
+            # global_biased_prediction, protected_biased_predictions = get_predictions(
+            #     global_batch,
+            #     protected_batches,
+            #     model_biased,
+            #     inverse_cummulative_data_covariance,
+            # )
+            if biased_dataset.get_size() == 0:
+                # ACCEPT ALL POINTS IF THE BIASED DATASET IS NOT INITIALIZED
+                global_biased_prediction = [1 for _ in range(nn_params.batch_size)]
+            else:
+                global_biased_prediction, protected_biased_predictions = get_predictions(
+                    global_batch,
+                    protected_batches,
+                    model_biased,
+                    inverse_cummulative_data_covariance,
+                )
 
         elif exploration_hparams.decision_type == "counterfactual":
             print(f"Training mode: {training_mode}")
@@ -507,118 +540,67 @@ def run_regret_experiment_pytorch(
                     "The counterfactual decision mode is incompatible with all "
                     "training modes different from full_minimization"
                 )
-
             if biased_dataset.get_size() == 0:
                 # ACCEPT ALL POINTS IF THE BIASED DATASET IS NOT INITIALIZED
                 global_biased_prediction = [1 for _ in range(nn_params.batch_size)]
             else:
-                if nn_params.pseudolabel:
+                # First get epsilon greedy, then apply pseudolabel.
+                # batch_size x 1
+                initial_biased_pred, _ = get_predictions(
+                    global_batch,
+                    protected_batches,
+                    model_biased,
+                    inverse_cummulative_data_covariance,
+                )
+                # TODO: check if epsilon set?
+                epsilon_fit = torch.rand_like(initial_biased_pred) < exploration_hparams.epsilon
+                random_action = torch.bitwise_and(
+                        initial_biased_pred < linear_model_hparams.biased_threshold,
+                        epsilon_fit
+                )
+                random_indices = torch.nonzero(random_action).squeeze(dim=1)
+                model_indices = torch.nonzero(~random_action).squeeze(dim=1)
+                model_pred = initial_biased_pred[model_indices]
+                # create pseudo batch from random decision indices.
+                pseudo_batch = (
+                    global_batch[0][random_indices],
+                    global_batch[1][random_indices]
+                )
+                # If no random points, just take model predictions.
+                global_biased_prediction = torch.zeros_like(initial_biased_pred)
+                global_biased_prediction[model_indices] = model_pred
+                # If random points, add those in.
+                if pseudo_batch[0].size()[0] > 0:
+                    # Confirm via pseudolabel.
                     # print("EVALUATING PSEUDO-LABEL")
-                    # Add psuedo label and train.
-                    pseudo_Y = np.ones(batch_X.shape[0])
-                    # print(f"Pseudo label: {pseudo_Y}")
-                    # print(f"Pseudo label shape: {pseudo_Y.shape}")
-                    # print(f"Batch X shape: {batch_X.shape}")
-                    biased_dataset.add_data(batch_X, pseudo_Y)
-                    # TODO
-                    model_biased_prediction = train_model_with_stopping(
-                        model_biased_prediction,
-                        num_full_minimization_steps,
-                        biased_dataset,
-                        nn_params.batch_size,
-                        verbose=verbose,
-                        restart_model_full_minimization=nn_params.restart_model_full_minimization,
-                        eps=0.0001 * np.log(counter + 2) / 2,
-                        weight_decay=nn_params.weight_decay
+                    eps = 0.0001 * np.log(counter + 2) / 2
+                    # Clone model before psuedolabeling.
+                    model_biased_prediction.network.load_state_dict(model_biased.network.state_dict())
+                    pseudo_pred, model_biased_prediction = pseudolabel(
+                        model_biased_prediction, nn_params, verbose,
+                        eps, test_batch=pseudo_batch,
+                        protected_batches_test=protected_batches,  # meaningless
+                        train_dataset=biased_dataset,
                     )
-                    # model_biased_prediction = train_model(
-                    #     model_biased_prediction, num_full_minimization_steps,
-                    #     biased_dataset, nn_params.batch_size,
-                    #     restart_model_full_minimization=nn_params.restart_model_full_minimization,
-                    #     weight_decay=nn_params.weight_decay
-                    # )
-                    biased_dataset.pop_last_data()
-                    global_biased_prediction, _ = get_predictions(
-                        global_batch, protected_batches, model_biased_prediction
-                    )
-                else:
-                    # EVALUATE THE EXPECTED LOSS
-                    with torch.no_grad():
-                        all_data_X, all_data_Y = biased_dataset.get_batch(10000000000)
-                        # Evaluate the loss over the existing dataset.
-                        loss_initial = model_biased.get_loss(all_data_X, all_data_Y)
-
-                    if exploration_hparams.loss_confidence_band is not None:
-                        loss_confidence_band = exploration_hparams.loss_confidence_band
-                    elif estimate_loss_confidence_band:
-                        print("Starting computation of the loss confidence band ")
-                        (
-                            loss_confidence_band,
-                            mean_loss_confidence_band,
-                        ) = compute_loss_confidence_band_with_stopping(
-                            10,
-                            model_biased,
-                            num_full_minimization_steps,
-                            biased_dataset,
-                            nn_params.batch_size,
-                            bottom_half=True,
-                            eps=0.0001 * np.log(counter + 2) / 2,
+                    if counter % logging_frequency * 1.0 == 0:
+                        # p(accept|positive), p(accept|negative)
+                        pseudo_breakdown = get_special_breakdown(
+                            pseudo_batch,
+                            model_biased_prediction,
+                            linear_model_hparams.threshold,
                         )
-                        loss_confidence_band *= 2
-                        loss_confidence_band += 0.0001 * np.log(counter + 2) / 2
-                        # loss_confidence_band = 2*compute_loss_confidence_band(
-                        # 10, model_biased, num_full_minimization_steps, biased_dataset,
-                        # batch_size, verbose = False
-                        # )
-                        gc.collect()
-                    else:
-                        loss_confidence_band = loss_initial
-
-                    # TODO: this is really small always...
-                    # print('HERE WE HAVE THE LOSS CONFIDENCE BAND: \n')
-                    # print(loss_confidence_band)
-
-                    counterfactual_reg = 1  # COUNTERFACTUAL REGULARIZATION
-
-                    model_biased_prediction = train_model_counterfactual_with_stopping(
-                        model_biased_prediction,
-                        loss_initial,
-                        loss_confidence_band,
-                        num_full_minimization_steps,
-                        biased_dataset,
-                        batch_X,
-                        nn_params.batch_size,
-                        counterfactual_reg,
-                        verbose=False,
-                        restart_model_full_minimization=False,
-                    )
-
-                    # loss_final = float("inf")
-
-                    # while loss_final > loss_initial + loss_confidence_band:
-                    #   print("Recomputing .... ")
-                    #   print(
-                    #     "Start training of conterfactual model", "loss initial ",
-                    #     loss_initial, " loss confidence band ", loss_confidence_band,
-                    # " loss_final ", loss_final)
-                    #   model_biased_prediction = train_model_counterfactual(
-                    # model_biased_prediction,  num_full_minimization_steps, biased_dataset,
-                    # batch_size, batch_X,
-                    #     counterfactual_regularizer = counterfactual_reg, verbose = (
-                    # False, restart_model_full_minimization = False)
-                    #   gc.collect()
-
-                    #   ### EVALUATE THE EXPECTED LOSS ##
-                    #   with torch.no_grad():
-                    #     loss_final = model_biased_prediction.get_loss(
-                    # all_data_X, all_data_Y)
-
-                    #   counterfactual_reg *= .5*counterfactual_reg
-
-                    global_biased_prediction, _ = get_predictions(
-                        global_batch, protected_batches, model_biased_prediction
-                    )
-                    print("Global biased prediction ", global_biased_prediction)
+                        eps_breakdown = get_breakdown_no_model(
+                            pseudo_batch,
+                        )
+                        pseudo_error_breakdown_list.append(pseudo_breakdown)
+                        eps_error_breakdown_list.append(eps_breakdown)
+                        # print("Pseudo Pred")
+                        # print(pseudo_pred)
+                        # print("Pseudo Breakdown")
+                        # print(pseudo_breakdown)
+                        # print("Eps Breakdown")
+                        # print(eps_breakdown)
+                    global_biased_prediction[random_indices] = pseudo_pred
 
         biased_batch_X = []
         biased_batch_y = []
@@ -626,66 +608,55 @@ def run_regret_experiment_pytorch(
         biased_train_accuracy = 0
         batch_regret = 0
 
-        # print(type(global_biased_prediction))
-        # if len(global_biased_prediction) == 1:
-        # FIX fix fix
-        if type(global_biased_prediction) == torch.Tensor and global_biased_prediction.size()[0] == 1:
-            # label = batch_y.item()
-            # print(batch_y)
-            label = batch_y[0]
+        # TODO: pull out and combine with method above.
+        try:
+            pred_len = len(global_biased_prediction)
+        except TypeError:
+            global_biased_prediction = global_biased_prediction.unsqueeze(-1)
+            pred_len = len(global_biased_prediction)
+        for i in range(pred_len):
+            label = batch_y[i]
             accuracy, regret, accepted = process_prediction(
-                global_biased_prediction.item(), label, linear_model_hparams,
-                exploration_hparams, regret_wrt_baseline, baseline_accuracy
+                global_biased_prediction[i], label, linear_model_hparams,
+                exploration_hparams, regret_wrt_baseline, baseline_accuracy, counter
             )
             biased_train_accuracy += accuracy
             batch_regret += regret
             if accepted:
-                biased_batch_X.append(batch_X[0])
+                biased_batch_X.append(batch_X[i].unsqueeze(0))
                 biased_batch_y.append(label)
                 biased_batch_size += 1
-        else:
-            for i in range(len(global_biased_prediction)):
-                label = batch_y[i]
-                accuracy, regret, accepted = process_prediction(
-                    global_biased_prediction[i], label, linear_model_hparams,
-                    exploration_hparams, regret_wrt_baseline, baseline_accuracy
-                )
-                biased_train_accuracy += accuracy
-                batch_regret += regret
-                if accepted:
-                    biased_batch_X.append(batch_X[i])
-                    biased_batch_y.append(label)
-                    biased_batch_size += 1
-        biased_batch_X = np.array(biased_batch_X)
-        biased_batch_y = np.array(biased_batch_y)
-
-        try:
-            size = len(global_biased_prediction)
-        except TypeError:
-            size = 1
+        size = len(global_biased_prediction)
         biased_train_accuracy = biased_train_accuracy / size
         batch_regret = batch_regret / size * 1.0
 
         biased_data_totals += biased_batch_size
+        if len(biased_batch_X) > 0:
+            biased_batch_X = torch.cat(biased_batch_X)
+            biased_batch_y = torch.Tensor(biased_batch_y).to('cuda')
 
         # Train biased model on biased data
         if biased_batch_size > 0:
             if training_mode == "full_minimization":
+                # print("Adding data to biased dataset")
                 biased_dataset.add_data(biased_batch_X, biased_batch_y)
-                # model_biased = train_model(
-                #     model_biased, num_full_minimization_steps, biased_dataset,
-                # batch_size, restart_model_full_minimization =
-                # restart_model_full_minimization)
-                print(f"Biased dataset: {biased_dataset}")
-                model_biased = train_model_with_stopping(
-                    model_biased,
-                    num_full_minimization_steps,
-                    biased_dataset,
-                    nn_params.batch_size,
-                    verbose=verbose,
-                    restart_model_full_minimization=restart_model_full_minimization,
-                    eps=0.0001 * np.log(counter + 2) / 2,
-                )
+                if FIXED_STEPS:
+                    model_biased = train_model(
+                        model_biased,
+                        num_full_minimization_steps,
+                        biased_dataset,
+                        nn_params.batch_size,
+                    )
+                else:
+                    model_biased = train_model_with_stopping(
+                        model_biased,
+                        num_full_minimization_steps,
+                        biased_dataset,
+                        nn_params.batch_size,
+                        verbose=verbose,
+                        restart_model_full_minimization=nn_params.restart_model_full_minimization,
+                        eps=0.0001 * np.log(counter + 2) / 2,
+                    )
                 gc.collect()
 
             elif training_mode == "gradient_step":
@@ -700,7 +671,8 @@ def run_regret_experiment_pytorch(
                 representation_X = model_biased.get_representation(
                     biased_batch_X
                 ).detach()
-                representation_X = representation_X.numpy()
+                # representation_X = representation_X.numpy()
+                representation_X = representation_X.cpu().numpy()
                 if exploration_hparams.adjust_mahalanobis:
                     if len(cummulative_data_covariance) == 0:
                         cummulative_data_covariance = np.dot(
@@ -781,8 +753,6 @@ def run_regret_experiment_pytorch(
                 loss_train_biased = loss_train_biased.detach()
 
             if verbose:
-                # IPython.embed()
-                # raise ValueError("as;kdfm")
                 print("Iteration {}".format(counter))
                 print(
                     "Total proportion of biased data {}".format(
@@ -830,18 +800,66 @@ def run_regret_experiment_pytorch(
         baseline_accuracy,
         train_error_breakdown_list,
         test_error_breakdown_list,
+        pseudo_error_breakdown_list,
+        eps_error_breakdown_list
     )
+
+
+def pseudolabel(
+    model, nn_params, verbose, eps, test_batch, protected_batches_test, train_dataset,
+    upweight=1
+):
+    # Treat all points as accepted.
+    batch_X = test_batch[0]
+    pseudo_Y = torch.ones(batch_X.shape[0]).to('cuda')
+    for x in range(upweight):
+        train_dataset.add_data(batch_X, pseudo_Y)
+    if FIXED_STEPS:
+        model = train_model(
+            model,
+            nn_params.num_full_minimization_steps * nn_params.pseudo_steps_multiplier,
+            train_dataset,
+            nn_params.batch_size,
+        )
+    else:
+        model = train_model_with_stopping(
+            model,
+            nn_params.num_full_minimization_steps * nn_params.pseudo_steps_multiplier,
+            train_dataset,
+            nn_params.batch_size,
+            verbose=verbose,
+            restart_model_full_minimization=nn_params.restart_model_full_minimization,
+            eps=eps,
+            weight_decay=nn_params.weight_decay
+        )
+    train_dataset.pop_last_data()
+    global_biased_prediction, _ = get_predictions(
+        test_batch, protected_batches_test, model
+    )
+    return global_biased_prediction, model
 
 
 def process_prediction(
     global_biased_prediction, label,
     linear_model_hparams, exploration_hparams,
-    regret_wrt_baseline, baseline_accuracy
+    regret_wrt_baseline, baseline_accuracy, t
 ):
-    accept_point = global_biased_prediction > linear_model_hparams.biased_threshold or (
-        exploration_hparams.epsilon_greedy
-        and np.random.random() < exploration_hparams.epsilon
-    )
+    # Decay epsilon for EG.
+    if exploration_hparams.epsilon_greedy:
+        # Cheating ofc.
+        epsilon = exploration_hparams.epsilon - ((exploration_hparams.epsilon - 0.01) * (t / 2000))
+        accept_point = global_biased_prediction > linear_model_hparams.biased_threshold or (
+            exploration_hparams.epsilon_greedy
+            and np.random.random() < epsilon
+        )
+    # Don't decay otherwise.
+    else:
+        accept_point = global_biased_prediction > linear_model_hparams.biased_threshold or (
+            exploration_hparams.epsilon_greedy
+            and np.random.random() < exploration_hparams.epsilon
+        )
+    # TODO: Get the false positive/fnr for the eps greedy points.
+    # if exploration_hparams.epsilon_greedy:
 
     # biased_train_accuracy += (accept_point == batch_y[i]) * 1.0
     if regret_wrt_baseline:

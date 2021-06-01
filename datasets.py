@@ -1,10 +1,7 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import random
 import torch
 from torchvision import datasets, transforms
 from datasets_fairness import (
@@ -45,26 +42,35 @@ class DataSet:
         #   Y_one_hot[:, i] = (Y == i)*1.0
         self.random_state += 1
 
-        return (X, Y)
+        return (torch.from_numpy(X).to('cuda'), torch.from_numpy(Y).to('cuda'))
 
 
 class GrowingNumpyDataSet:
     def __init__(self):
-        self.dataset_X = []  # None
-        self.dataset_Y = []  # None
+        self.dataset_X = None
+        self.dataset_Y = None
         self.last_data_addition = None
         self.random_state = 0
 
     def get_size(self):
+        if self.dataset_Y is None:
+            return 0
         return len(self.dataset_Y)
 
     def add_data(self, X, Y):
-        if len(self.dataset_X) == 0 and len(self.dataset_Y) == 0:
+        if self.dataset_X is None and self.dataset_Y is None:
             self.dataset_X = X
             self.dataset_Y = Y
         else:
-            self.dataset_X = np.concatenate((self.dataset_X, X))
-            self.dataset_Y = np.concatenate((self.dataset_Y, Y))
+            self.dataset_X = torch.cat((self.dataset_X, X), dim=0)
+            self.dataset_Y = torch.cat((self.dataset_Y, Y), dim=0)
+        # print("shapes")
+        # print(self.dataset_X.shape)
+        # print(X.shape)
+        # print("datasets")
+        # print(self.dataset_X)
+        # print(X)
+        # print(self.dataset_X.shape)
 
         self.last_data_addition = X.shape[0]
 
@@ -80,22 +86,18 @@ class GrowingNumpyDataSet:
             self.dataset_Y = self.dataset_Y[: -self.last_data_addition]
 
     def get_batch(self, batch_size):
-        if batch_size > self.dataset_X.shape[0]:
+        if self.dataset_X is None:
+            X = torch.empty(0)
+            Y = torch.empty(0)
+        elif batch_size > self.dataset_X.shape[0]:
             X = self.dataset_X
             Y = self.dataset_Y
         else:
-            X = (
-                pd.DataFrame(self.dataset_X)
-                .sample(batch_size, random_state=self.random_state)
-                .values
-            )
-            Y = (
-                pd.DataFrame(self.dataset_Y)
-                .sample(batch_size, random_state=self.random_state)
-                .values
-            )
+            indices = random.sample(range(self.dataset_X.shape[0]), batch_size)
+            indices = torch.tensor(indices)
+            X = self.dataset_X[indices]
+            Y = self.dataset_Y[indices]
         self.random_state += 1
-
         return (X, Y)
 
 
@@ -123,7 +125,12 @@ class MNISTDataset:
         [X, Y] = next(iter(self.data_loader))
         Y = (Y == self.symbol) * 1.0
         X = X.view(self.batch_size, -1)
-        return (X.numpy(), Y.numpy())
+        if torch.cuda.is_available():
+            # print("Getting gpu")
+            X = X.to('cuda')
+            Y = Y.to('cuda')
+        return (X, Y)
+        # return (X.numpy(), Y.numpy())
 
 
 class MixtureGaussianDataset:
@@ -223,6 +230,11 @@ class SVMDataset:
         X = np.array(X)
         Y = np.array(Y)
         indices = np.array(indices)
+
+        if torch.cuda.is_available():
+            X = torch.from_numpy(X).to('cuda')
+            Y = torch.from_numpy(Y).to('cuda')
+
         if verbose:
             return (X, Y, indices)
         else:

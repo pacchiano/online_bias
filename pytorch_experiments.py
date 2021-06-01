@@ -12,7 +12,9 @@ from typing import Any
 
 
 USE_RAY = True
+NUM_EXPERIMENTS = 5
 # USE_RAY = False
+# NUM_EXPERIMENTS = 1
 
 LINEWIDTH = 3.5
 LINESTYLE = "dashed"
@@ -25,10 +27,9 @@ class NNParams:
     representation_layer_size = 40
     max_num_steps = 100
     baseline_steps = 10000
-    # batch_size = 32
-    batch_size = 1
-    # num_full_minimization_steps = 200
+    batch_size = 32
     num_full_minimization_steps = 100
+    pseudo_steps_multiplier = 8
     random_init = True
     restart_model_full_minimization = True
     weight_decay = 0.0
@@ -45,17 +46,11 @@ class LinearModelHparams:
 
 @dataclass
 class ExplorationHparams:
-    # TODO: initial sweep values.
-    # mahalanobis_discount_factors = [1, 0.9, 0.8]
-    # mahalanobis_reguarizers = [0.1]
-    # epsilons = [0.1, 0.2, 0.5]
-    # alphas = [1, 4]
-    mahalanobis_discount_factors = 1
-    mahalanobis_reguarizers = 0.1
+    mahalanobis_discount_factor = 1
+    mahalanobis_regularizer = 0.1
     epsilon = 0.1
     alpha = 1
     decision_type = "counterfactual"
-    # TODO
     epsilon_greedy = False
     adjust_mahalanobis = False
     loss_confidence_band = None
@@ -90,7 +85,8 @@ def conditionally(dec, cond):
     return resdec
 
 
-@conditionally(ray.remote, USE_RAY)
+@conditionally(ray.remote(num_gpus=1), USE_RAY)
+# @conditionally(ray.remote(num_gpus=1), USE_RAY)
 def run_experiment_parallel(
     dataset,
     training_mode,
@@ -110,7 +106,9 @@ def run_experiment_parallel(
         loss_baseline,
         baseline_accuracy,
         train_error_breakdown,
-        test_error_breakdown
+        test_error_breakdown,
+        pseudo_error_breakdown,
+        eps_error_breakdown
     ) = run_regret_experiment_pytorch(
         dataset,
         training_mode,
@@ -130,7 +128,9 @@ def run_experiment_parallel(
         loss_baseline,
         baseline_accuracy,
         train_error_breakdown,
-        test_error_breakdown
+        test_error_breakdown,
+        pseudo_error_breakdown,
+        eps_error_breakdown
     )
 
 
@@ -139,12 +139,6 @@ def configure_directories(dataset, nn_params, linear):
     network_type = (
         "Linear{}".format(nn_params.representation_layer_size) if linear else "MLP"
     )
-    # base_data_directory = "{}/experiment_results/{}/{}/{}/data".format(
-    #     path, nn_params.max_num_steps, network_type, dataset
-    # )
-    # base_figs_directory = "{}/experiment_results/T{}/{}/{}/figs".format(
-    #     path, nn_params.max_num_steps, network_type, dataset
-    # )
     base_data_directory = "{}/experiment_results/{}/data".format(
         path, dataset
     )
@@ -205,17 +199,6 @@ def run_experiments(
             )
             for _ in range(num_experiments)
         ]
-    # experiment_summaries = [
-    #     run_experiment_parallel(
-    #         dataset,
-    #         training_mode,
-    #         nn_params,
-    #         linear_model_hparams,
-    #         exploration_hparams,
-    #         logging_frequency,
-    #     )
-    #     for _ in range(num_experiments)
-    # ]
     return experiment_summaries
 
 
@@ -321,11 +304,6 @@ def plot_helper(timesteps, accuracies, accuracies_stds, label, color, broadcast=
     if broadcast:
         accuracies = np.array([accuracies] * len(timesteps))
         accuracies_stds = np.array([accuracies_stds] * len(timesteps))
-    # print("INSIDE PLOT HELPER")
-    # print(f"Timesteps: {timesteps}")
-    # print(f"Type Timesteps: {type(timesteps)}")
-    # print(f"Accuracies: {accuracies}")
-    # print(f"type Accuracies: {type(accuracies)}")
     plt.plot(
         timesteps,
         accuracies,
@@ -451,7 +429,6 @@ def plot_results(
         "Biased Model Test - no decision adjustment",
         "blue",
     )
-    # TODO: is this on test set or train set?
     plot_helper(
         timesteps,
         experiment_results.mean_accuracies_cum_averages,
@@ -459,7 +436,6 @@ def plot_results(
         label="Unbiased Model Test - all data train",
         color="red",
     )
-    # TODO: this looks like the right dataset, why does it seem buggy?
     plot_helper(
         timesteps,
         experiment_results.mean_train_biased_accuracies_cum_averages,
@@ -570,7 +546,6 @@ def run_and_plot(
     logging_frequency,
     num_experiments,
 ):
-    # TODO?
     if USE_RAY:
         ray.init()
     start_time = time.time()
@@ -583,7 +558,7 @@ def run_and_plot(
 
     print(
         f"Starting Experiment {dataset} T{nn_params.max_num_steps} "
-        f"{training_mode} {exploration_hparams}"
+        f"{training_mode} {repr(exploration_hparams)}"
     )
     experiment_summaries = run_experiments(
         dataset,
@@ -618,23 +593,35 @@ def run_and_plot(
         (
             timesteps,
             nn_params.max_num_steps,
-            experiment_results.mean_test_biased_accuracies_cum_averages,
-            experiment_results.std_test_biased_accuracies_cum_averages,
-            experiment_results.mean_accuracies_cum_averages,
-            experiment_results.std_accuracies_cum_averages,
-            experiment_results.mean_train_biased_accuracies_cum_averages,
-            experiment_results.std_train_biased_accuracies_cum_averages,
-            experiment_results.mean_loss_validation_averages,
-            experiment_results.std_loss_validation_averages,
-            experiment_results.mean_loss_validation_biased_averages,
-            experiment_results.std_loss_validation_biased_averages,
+            experiment_results,
         ),
         open("{}/{}.p".format(base_data_directory, "data_dump"), "wb"),
     )
-    # print(f"FPR and FNR: {experiment_summaries[-1][-1]}")
+    train_breakdowns = []
+    test_breakdowns = []
+    pseudo_breakdowns = []
+    eps_breakdowns = []
+    for summary in experiment_summaries:
+        train_breakdowns.append(summary[-4])
+        test_breakdowns.append(summary[-3])
+        pseudo_breakdowns.append(summary[-2])
+        eps_breakdowns.append(summary[-1])
+    # print("Train Breakdowns")
+    # print(train_breakdowns)
+    # print("Test Breakdowns")
+    # print(test_breakdowns)
+    # print("Pseudo Breakdowns")
+    # print(pseudo_breakdowns)
+    # print("Eps Breakdowns")
+    # print(eps_breakdowns)
     pickle.dump(
         # FPR/FNR
-        experiment_summaries[-1],
+        (
+            train_breakdowns,
+            test_breakdowns,
+            pseudo_breakdowns,
+            eps_breakdowns
+        ),
         open("{}/{}.p".format(base_data_directory, "fnr_dump"), "wb"),
     )
     end_time = time.time()
@@ -643,22 +630,30 @@ def run_and_plot(
 
 
 if __name__ == "__main__":
+    dataset = "Adult"
+    # dataset = "Bank"
     # dataset = "MultiSVM"
-    dataset = "MNIST"
+    # dataset = "MNIST"
     training_mode = "full_minimization"
     nn_params = NNParams()
-    nn_params.max_num_steps = 2
-    nn_params.baseline_steps = 3
-    nn_params.batch_size = 10
+    nn_params.max_num_steps = 20
+    # nn_params.max_num_steps = 2000
+    nn_params.baseline_steps = 100
+    # nn_params.baseline_steps = 10000
+    # nn_params.baseline_steps = 24_000
+    nn_params.batch_size = 32
+    # nn_params.batch_size = 1
     linear_model_hparams = LinearModelHparams()
     exploration_hparams = ExplorationHparams()
-    # exploration_hparams.decision_type = "simple"
+    exploration_hparams.decision_type = "simple"
+    exploration_hparams.adjust_mahalanobis = True
     # exploration_hparams.epsilon_greedy = True
-    exploration_hparams.decision_type = "counterfactual"
-    # exploration_hparams.loss_confidence_band = 0
+    # exploration_hparams.epsilon = 0.1
+    exploration_hparams.epsilon_greedy = False
+    # exploration_hparams.decision_type = "counterfactual"
     # TODO
-    num_experiments = 2
-    logging_frequency = 1
+    # logging_frequency = 10
+    logging_frequency = 2
     run_and_plot(
         dataset,
         training_mode,
@@ -666,5 +661,5 @@ if __name__ == "__main__":
         linear_model_hparams,
         exploration_hparams,
         logging_frequency,
-        num_experiments,
+        NUM_EXPERIMENTS,
     )
