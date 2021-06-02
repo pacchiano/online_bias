@@ -636,7 +636,7 @@ if __name__ == "__main__":
     # dataset = "MNIST"
     training_mode = "full_minimization"
     nn_params = NNParams()
-    nn_params.max_num_steps = 20
+    nn_params.max_num_steps = 2
     # nn_params.max_num_steps = 2000
     nn_params.baseline_steps = 100
     # nn_params.baseline_steps = 10000
