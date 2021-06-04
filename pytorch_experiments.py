@@ -140,16 +140,16 @@ def run_experiment_parallel(
     )
 
 
-def configure_directories(dataset, nn_params, linear):
+def configure_directories(dataset, nn_params, linear, algo):
     path = os.getcwd()
     network_type = (
         "Linear{}".format(nn_params.representation_layer_size) if linear else "MLP"
     )
-    base_data_directory = "{}/experiment_results/{}/data".format(
-        path, dataset
+    base_data_directory = "{}/experiment_results/{}/{}/data".format(
+        path, dataset, algo
     )
-    base_figs_directory = "{}/experiment_results/{}/figs".format(
-        path, dataset
+    base_figs_directory = "{}/experiment_results/{}/{}/figs".format(
+        path, dataset, algo
     )
 
     if not os.path.isdir(base_data_directory):
@@ -552,13 +552,14 @@ def run_and_plot(
     logging_frequency,
     num_experiments,
     use_ray,
+    algo,
 ):
     if use_ray:
         ray.init()
     start_time = time.time()
     linear = False
     network_type, base_figs_directory, base_data_directory = configure_directories(
-        dataset, nn_params, linear
+        dataset, nn_params, linear, algo
     )
     if exploration_hparams.epsilon_greedy and exploration_hparams.adjust_mahalanobis:
         raise ValueError("Both epsilon greedy and adjust mahalanobis are on!")
@@ -686,7 +687,8 @@ if __name__ == "__main__":
                     exploration_hparams,
                     logging_frequency,
                     NUM_EXPERIMENTS,
-                    RAY
+                    RAY,
+                    algo_name
                 )
     else:
         dataset = "Adult"
@@ -700,5 +702,6 @@ if __name__ == "__main__":
             exploration_hparams,
             logging_frequency,
             NUM_EXPERIMENTS,
-            RAY
+            RAY,
+            algo_name
         )

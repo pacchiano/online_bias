@@ -114,10 +114,13 @@ def plot_helper(x, ys, title):
 def process_data():
     with open("data_dump.p", 'rb') as f:
         x = pickle.load(f)
+    print("Cumulative Regret: Mean")
     print([round(a, 3) for a in list(x[2].mean_train_cum_regret_averages)])
+    print("Cumulative Regret: Std Dev")
+    print([round(a, 3) for a in list(x[2].std_train_cum_regret_averages)])
 
 
 
-# process_data()
-process_fnr()
+process_data()
+# process_fnr()
 # plot_fnr()
