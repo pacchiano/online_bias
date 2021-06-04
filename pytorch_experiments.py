@@ -4,22 +4,38 @@ import matplotlib.pyplot as plt
 import os
 import pickle
 import ray
+import sys
 import time
 
 from dataclasses import dataclass
 from experiment_regret import run_regret_experiment_pytorch
 from typing import Any
 
-
-USE_RAY = True
-NUM_EXPERIMENTS = 5
-# USE_RAY = False
-# NUM_EXPERIMENTS = 1
-
 LINEWIDTH = 3.5
 LINESTYLE = "dashed"
 STD_GAP = 0.5
 ALPHA = 0.1
+
+
+def algo_to_params(algo):
+    exploration_hparams = ExplorationHparams()
+    exploration_hparams.epsilon = 0.2
+    if algo == "Eps_Greedy":
+        exploration_hparams.decision_type = "simple"
+        exploration_hparams.epsilon_greedy = True
+    elif algo == "Greedy":
+        exploration_hparams.decision_type = "simple"
+        exploration_hparams.epsilon_greedy = False
+    elif algo == "NeuralUCB":
+        exploration_hparams.decision_type = "simple"
+        exploration_hparams.adjust_mahalanobis = True
+        exploration_hparams.mahalanobis_discount_factor = 0.9
+        exploration_hparams.alpha = 4
+    elif algo == "PLOT":
+        exploration_hparams.decision_type = "counterfactual"
+    else:
+        raise ValueError("Unsupported Online Algorithm")
+    return exploration_hparams
 
 
 @dataclass
@@ -48,7 +64,7 @@ class LinearModelHparams:
 class ExplorationHparams:
     mahalanobis_discount_factor = 1
     mahalanobis_regularizer = 0.1
-    epsilon = 0.1
+    epsilon = 0.2
     alpha = 1
     decision_type = "counterfactual"
     epsilon_greedy = False
@@ -77,16 +93,6 @@ class ExperimentResults:
     std_accuracy_validation_baseline_summary: Any
 
 
-def conditionally(dec, cond):
-    def resdec(f):
-        if not cond:
-            return f
-        return dec(f)
-    return resdec
-
-
-@conditionally(ray.remote(num_gpus=1), USE_RAY)
-# @conditionally(ray.remote(num_gpus=1), USE_RAY)
 def run_experiment_parallel(
     dataset,
     training_mode,
@@ -172,8 +178,9 @@ def run_experiments(
     exploration_hparams,
     logging_frequency,
     num_experiments,
+    use_ray,
 ):
-    if USE_RAY:
+    if use_ray:
         experiment_summaries = [
             run_experiment_parallel.remote(
                 dataset,
@@ -374,8 +381,7 @@ def plot_title(
                 training_mode,
             )
         if (
-            not exploration_hparams.epsilon_greedy
-            and not exploration_hparams.adjust_mahalanobis
+            not exploration_hparams.epsilon_greedy and not exploration_hparams.adjust_mahalanobis
         ):
             plt.title(
                 "{} {} - {} - {} ".format(
@@ -545,8 +551,9 @@ def run_and_plot(
     exploration_hparams,
     logging_frequency,
     num_experiments,
+    use_ray,
 ):
-    if USE_RAY:
+    if use_ray:
         ray.init()
     start_time = time.time()
     linear = False
@@ -568,6 +575,7 @@ def run_and_plot(
         exploration_hparams,
         logging_frequency,
         num_experiments,
+        use_ray,
     )
     experiment_results = analyze_experiments(
         experiment_summaries,
@@ -630,36 +638,67 @@ def run_and_plot(
 
 
 if __name__ == "__main__":
-    dataset = "Adult"
-    # dataset = "Bank"
-    # dataset = "MultiSVM"
-    # dataset = "MNIST"
-    training_mode = "full_minimization"
+    T = 2000
+    BASELINE_STEPS = 20_000
+    BATCH_SIZE = 32
+
     nn_params = NNParams()
-    nn_params.max_num_steps = 2
-    # nn_params.max_num_steps = 2000
-    nn_params.baseline_steps = 100
-    # nn_params.baseline_steps = 10000
-    # nn_params.baseline_steps = 24_000
-    nn_params.batch_size = 32
-    # nn_params.batch_size = 1
+    nn_params.max_num_steps = T
+    nn_params.batch_size = BATCH_SIZE
+    nn_params.baseline_steps = BASELINE_STEPS
     linear_model_hparams = LinearModelHparams()
     exploration_hparams = ExplorationHparams()
-    exploration_hparams.decision_type = "simple"
-    exploration_hparams.adjust_mahalanobis = True
-    # exploration_hparams.epsilon_greedy = True
-    # exploration_hparams.epsilon = 0.1
-    exploration_hparams.epsilon_greedy = False
-    # exploration_hparams.decision_type = "counterfactual"
-    # TODO
-    # logging_frequency = 10
-    logging_frequency = 2
-    run_and_plot(
-        dataset,
-        training_mode,
-        nn_params,
-        linear_model_hparams,
-        exploration_hparams,
-        logging_frequency,
-        NUM_EXPERIMENTS,
-    )
+    logging_frequency = min(10, T % 5)
+    training_mode = "full_minimization"
+    MULTI = False
+    RAY = False
+    NUM_EXPERIMENTS = 1
+    try:
+        MULTI = sys.argv[1]
+    except IndexError:
+        pass
+    try:
+        RAY = sys.argv[2]
+    except IndexError:
+        pass
+    try:
+        NUM_EXPERIMENTS = sys.argv[3]
+    except IndexError:
+        pass
+
+    if RAY:
+        NUM_EXPERIMENTS = 5
+        # run_experiment_parallel = ray.remote(num_gpus=1)(run_experiment_parallel)
+        run_experiment_parallel = ray.remote(run_experiment_parallel)
+        RAY = True
+
+    if MULTI:
+        algos = ["Eps_Greedy", "Greedy", "NeuralUCB", "PLOT"]
+        datasets = ["Adult", "Bank", "MultiSVM", "MNIST"]
+        for algo_name in algos:
+            exploration_hparams = algo_to_params(algo_name)
+            for dataset in datasets:
+                run_and_plot(
+                    dataset,
+                    training_mode,
+                    nn_params,
+                    linear_model_hparams,
+                    exploration_hparams,
+                    logging_frequency,
+                    NUM_EXPERIMENTS,
+                    RAY
+                )
+    else:
+        dataset = "Adult"
+        algo_name = "PLOT"
+        exploration_hparams = algo_to_params(algo_name)
+        run_and_plot(
+            dataset,
+            training_mode,
+            nn_params,
+            linear_model_hparams,
+            exploration_hparams,
+            logging_frequency,
+            NUM_EXPERIMENTS,
+            RAY
+        )

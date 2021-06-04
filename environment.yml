@@ -1,16 +1,17 @@
-name: fair_bandits
+name: plot_neurips
 channels:
+  - conda-forge
   - javascript
 dependencies:
-  - pytorch=1.7
-  - python=3.7
+  - IPython
   - matplotlib
   - pandas
-  - scipy
-  - sklearn
-  - torchvision
-  - IPython
-  - submitit
+  - pip>=21.0
   - pip:
     - ray
     - sklearn
+    - submitit
+  - python=3.7
+  - pytorch=1.7
+  - scipy
+  - torchvision
