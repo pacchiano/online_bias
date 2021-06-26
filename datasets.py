@@ -576,3 +576,18 @@ def get_dataset(dataset, batch_size, test_batch_size):
         train_dataset,
         test_dataset,
     )
+
+
+def get_dataset_simple(dataset, batch_size, test_batch_size):
+
+    (
+        protected_datasets_train,
+        protected_datasets_test,
+        train_dataset,
+        test_dataset,
+    ) = get_dataset(dataset, batch_size, test_batch_size)
+
+
+    return train_dataset, test_dataset
+
+
