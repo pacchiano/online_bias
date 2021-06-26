@@ -51,6 +51,7 @@ class GrowingNumpyDataSet:
         self.dataset_Y = None
         self.last_data_addition = None
         self.random_state = 0
+        self.dimension = None
 
     def get_size(self):
         if self.dataset_Y is None:
@@ -61,6 +62,7 @@ class GrowingNumpyDataSet:
         if self.dataset_X is None and self.dataset_Y is None:
             self.dataset_X = X
             self.dataset_Y = Y
+            self.dimension = X.shape[1]
         else:
             self.dataset_X = torch.cat((self.dataset_X, X), dim=0)
             self.dataset_Y = torch.cat((self.dataset_Y, Y), dim=0)
@@ -116,6 +118,9 @@ class MNISTDataset:
         self.data_loader = torch.utils.data.DataLoader(
             self.dataset, batch_size=batch_size, shuffle=True
         )
+
+        ### Figure dimension
+        
 
     def get_batch(self, batch_size):
         if batch_size != self.batch_size:
