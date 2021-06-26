@@ -13,25 +13,38 @@ class Breakdown:
 
 
 class Feedforward(torch.nn.Module):
-    def __init__(self, input_size, hidden_size, MLP=True):
+    def __init__(self, input_size, hidden_size, MLP=True, CUDA = True):
         super(Feedforward, self).__init__()
         self.MLP = MLP
         self.input_size = input_size
         self.sigmoid = torch.nn.Sigmoid()
+        self.CUDA = CUDA
 
         if self.MLP:
             self.hidden_size = hidden_size
             # TODO?
-            self.fc1 = torch.nn.Linear(self.input_size, self.hidden_size).to('cuda')
-            self.relu = torch.nn.ReLU().to('cuda')
-            self.fc2 = torch.nn.Linear(self.hidden_size, 1).to('cuda')
+            if self.CUDA:
+                self.fc1 = torch.nn.Linear(self.input_size, self.hidden_size).to('cuda')
+                self.relu = torch.nn.ReLU().to('cuda')
+                self.fc2 = torch.nn.Linear(self.hidden_size, 1).to('cuda')
+            else:
+                self.fc1 = torch.nn.Linear(self.input_size, self.hidden_size)
+                self.relu = torch.nn.ReLU()
+                self.fc2 = torch.nn.Linear(self.hidden_size, 1)
+
+
 
         else:
-            self.fc1 = torch.nn.Linear(self.input_size, 1, bias=False).to('cuda')
+            if self.CUDA:
+                self.fc1 = torch.nn.Linear(self.input_size, 1, bias=False).to('cuda')
+            else:
+                self.fc1 = torch.nn.Linear(self.input_size, 1, bias=False)
 
     def forward(self, x, inverse_data_covariance=[], alpha=0):
         # TODO
-        x = x.to('cuda')
+        if self.CUDA:
+            x = x.to('cuda')
+    
         if self.MLP:
             hidden = self.fc1(x)
             representation = self.relu(hidden)
@@ -45,10 +58,15 @@ class Feedforward(torch.nn.Module):
         if len(inverse_data_covariance) != 0:
             # IPython.embed()
             # raise ValueError("asdlfkm")
+            if self.CUDA:
+                inverse_data_covariance = inverse_data_covariance.float().to('cuda')
+
+
+
             output = torch.squeeze(output) + alpha * torch.sqrt(
                 torch.matmul(
                     representation,
-                    torch.matmul(inverse_data_covariance.float().to('cuda'), representation.t()),
+                    torch.matmul(inverse_data_covariance.float(), representation.t()),
                 ).diag()
             )
 
@@ -76,6 +94,7 @@ class TorchBinaryLogisticRegression:
         alpha=1,
         MLP=True,
         representation_layer_size=100,
+        CUDA = True,
     ):
         self.fit_intercept = fit_intercept
         self.theta = None
@@ -84,6 +103,7 @@ class TorchBinaryLogisticRegression:
         self.MLP = MLP
         self.representation_layer_size = representation_layer_size
         self.criterion = torch.nn.BCELoss()
+        self.CUDA = CUDA
 
         if dim is not None:
             self.network = Feedforward(dim, representation_layer_size, MLP)
@@ -121,7 +141,10 @@ class TorchBinaryLogisticRegression:
         #     pass
         # intercept = np.ones((batch_X.shape[0], 1))
         # return np.concatenate((batch_X, intercept), axis=1)
-        intercept = torch.ones(batch_X.shape[0], 1).to('cuda')
+        if self.CUDA:
+            intercept = torch.ones(batch_X.shape[0], 1).to('cuda')
+        else:
+            intercept = torch.ones(batch_X.shape[0], 1)
         return torch.cat((batch_X, intercept), dim=1)
 
     def __sigmoid(self, z):
@@ -173,7 +196,8 @@ class TorchBinaryLogisticRegression:
         # raise ValueError("Asdflkm")
         # if self.MLP:
         # prob_predictions, representations =  self.network(batch_X.float())#.squeeze()
-        self.network.to('cuda')
+        if self.CUDA:
+            self.network.to('cuda')
         # TODO: get np object to float64.
         # print(type(batch_X))
         # print(batch_X.shape)
