@@ -106,7 +106,7 @@ class TorchBinaryLogisticRegression:
         self.CUDA = CUDA
 
         if dim is not None:
-            self.network = Feedforward(dim, representation_layer_size, MLP)
+            self.network = Feedforward(dim, representation_layer_size, MLP, CUDA)
             # self.initialize_gaussian()
 
     def initialize_gaussian(self):
@@ -127,7 +127,7 @@ class TorchBinaryLogisticRegression:
         # if self.fit_intercept:
         #       batch_X = self.__add_intercept(batch_X)
         self.network = Feedforward(
-            data_dim + self.fit_intercept, self.representation_layer_size, self.MLP
+            data_dim + self.fit_intercept, self.representation_layer_size, self.MLP, CUDA = self.CUDA
         )
         # self.network = Feedforward(batch_X.shape[1], self.representation_layer_size, self.MLP)
 
