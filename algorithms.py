@@ -26,82 +26,11 @@ from models import (
     get_special_breakdown
 )
 
-from pytorch_experiments import analyze_experiments, algo_to_params, NNParams, LinearModelHparams, ExplorationHparams, ExperimentResults
+#from pytorch_experiments import analyze_experiments, algo_to_params, NNParams, LinearModelHparams, ExplorationHparams, ExperimentResults
 
+from model_training_utilities import train_model
 
-
-#@title Useful model training utilities
-#Useful utilities. The following function allows to train a model 
-### for a number of steps.
-def gradient_step(model, optimizer, batch_X, batch_y):
-
-    optimizer.zero_grad()
-    loss = model.get_loss(batch_X, batch_y)
-    loss.backward()
-    optimizer.step()
-
-    return model, optimizer
-
-
-# def train_model(
-#     model,
-#     num_steps,
-#     train_dataset,
-#     batch_size,
-#     verbose=False,
-#     restart_model_full_minimization=True,
-#     weight_decay=0.0
-# ):
-#     for i in range(num_steps):
-#         if verbose:
-#             print("train model iteration ", i)
-#         batch_X, batch_y = train_dataset.get_batch(batch_size)
-#         if i == 0:
-#             restart_model_full_minimization = False
-#             if restart_model_full_minimization:
-#                 if len(batch_X.shape) == 1:
-#                     batch_X = np.expand_dims(batch_X, axis=1)
-#                 model.initialize_model(batch_X.shape[1])
-#             optimizer = torch.optim.Adam(
-#                 model.network.parameters(), lr=0.01, weight_decay=weight_decay
-#             )
-
-#         model, optimizer = gradient_step(model, optimizer, batch_X, batch_y)
-
-#     return model
-
-
-def train_model(
-    model,
-    num_steps,
-    train_dataset,
-    batch_size,
-    verbose=False,
-    restart_model_full_minimization=False,
-    weight_decay=0.0
-):
-    if restart_model_full_minimization: 
-        model.reinitialize_model()
-
-    optimizer = torch.optim.Adam(model.network.parameters(), lr=0.01, weight_decay=weight_decay )
-
-    for i in range(num_steps):
-        if verbose:
-            print("train model iteration ", i)
-        batch_X, batch_y = train_dataset.get_batch(batch_size)
-
-        model, optimizer = gradient_step(model, optimizer, batch_X, batch_y)
-
-    return model
-
-
-
-
-
-
-
-
-def train_baseline(dataset, num_timesteps, batch_size, MLP = True, 
+def train_vanilla(dataset, num_opt_steps, batch_size, MLP = True, 
     representation_layer_size = 10, threshold = .5, fit_intercept = True):
     
 
@@ -128,7 +57,7 @@ def train_baseline(dataset, num_timesteps, batch_size, MLP = True,
 
 
     baseline_model = train_model(
-        baseline_model, num_timesteps, train_dataset, batch_size
+        baseline_model, num_opt_steps, train_dataset, batch_size
     )
 
 
@@ -371,31 +300,29 @@ def train_PLOT(dataset, baseline_model, num_batches, batch_size,
 
 
 
+if __name__ == "__main__":
 
 
 
+    dataset = "Bank"
 
 
-dataset = "Bank"
+    baseline_test_accuracy, baseline_model = train_vanilla(dataset, num_opt_steps = 1000, 
+        batch_size = 32, 
+        MLP = True, representation_layer_size = 10)
 
 
-baseline_test_accuracy, baseline_model = train_baseline(dataset, num_timesteps = 1000, 
-    batch_size = 32, 
-    MLP = True, representation_layer_size = 10)
+    instantaneous_epsilon_regrets, instantaneous_epsilon_accuracies, test_epsilon_accuracy = train_epsilon_greedy(dataset, baseline_model, 
+        num_batches = 100, batch_size = 32, 
+        num_opt_steps = 1000, opt_batch_size = 20, MLP = True, 
+        representation_layer_size = 10, threshold = .5, verbose = True, decaying_epsilon = True)
 
 
-instantaneous_epsilon_regrets, instantaneous_epsilon_accuracies, test_epsilon_accuracy = train_epsilon_greedy(dataset, baseline_model, 
-    num_batches = 100, batch_size = 32, 
-    num_opt_steps = 1000, opt_batch_size = 20, MLP = True, 
-    representation_layer_size = 10, threshold = .5, verbose = True, decaying_epsilon = True)
-
-
-instantaneous_PLOT_regrets, instantaneous_PLOT_accuracies, test_PLOT_accuracy = train_PLOT(dataset, baseline_model, 
-    num_batches = 100, batch_size = 32, 
-    num_opt_steps = 1000, opt_batch_size = 20, MLP = True, 
-    representation_layer_size = 10, threshold = .5, verbose = True, decaying_epsilon = True)
+    instantaneous_PLOT_regrets, instantaneous_PLOT_accuracies, test_PLOT_accuracy = train_PLOT(dataset, baseline_model, 
+        num_batches = 100, batch_size = 32, 
+        num_opt_steps = 1000, opt_batch_size = 20, MLP = True, 
+        representation_layer_size = 10, threshold = .5, verbose = True, decaying_epsilon = True)
 
 
 
-IPython.embed()
-
+    IPython.embed()
