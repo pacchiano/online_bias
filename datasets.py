@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import random
+import IPython
 import torch
 from torchvision import datasets, transforms
 from datasets_fairness import (
@@ -20,15 +21,36 @@ from datasets_fairness import (
 )
 
 
+
+
+### Adds an intercept to the batch
+# def add_intercept(batch_X):
+#         # TODO
+#         # try:
+#         #     batch_X = batch_X.cpu()
+#         # except AttributeError:
+#         #     pass
+#         # intercept = np.ones((batch_X.shape[0], 1))
+#         # return np.concatenate((batch_X, intercept), axis=1)
+#         if torch.cuda.is_available():
+#             intercept = torch.ones(batch_X.shape[0], 1).to('cuda')
+#         else:
+#             intercept = torch.ones(batch_X.shape[0], 1)
+#         return torch.cat((batch_X, intercept), dim=1)
+
+
+
 # @title Data utilities
 class DataSet:
-    def __init__(self, dataset, labels, num_classes=2):
+    def __init__(self, dataset, labels, num_classes=2, fit_intercept = False):
         self.num_datapoints = dataset.shape[0]
-        self.dimension = dataset.shape[1]
         self.random_state = 0
         self.dataset = dataset
         self.labels = labels
         self.num_classes = num_classes
+        self.fit_intercept = fit_intercept
+        self.dimension = dataset.shape[1] +fit_intercept 
+
 
     def get_batch(self, batch_size):
         if batch_size > self.num_datapoints:
@@ -41,8 +63,18 @@ class DataSet:
         # for i in range(self.num_classes):
         #   Y_one_hot[:, i] = (Y == i)*1.0
         self.random_state += 1
+        
+        if self.fit_intercept:
+            intercept = np.ones(X.shape[0])
+            #IPython.embed()
+            X = np.concatenate((X, intercept.reshape(len(intercept), 1)), axis = 1)
 
-        return (torch.from_numpy(X).to('cuda'), torch.from_numpy(Y).to('cuda'))
+
+        if torch.cuda.is_available():
+            return (torch.from_numpy(X).to('cuda'), torch.from_numpy(Y).to('cuda'))
+
+        else:
+            return (torch.from_numpy(X).float(), torch.from_numpy(Y))
 
 
 class GrowingNumpyDataSet:
@@ -120,7 +152,11 @@ class MNISTDataset:
         )
 
         ### Figure dimension
-        
+        (X,Y) = self.get_batch(self.batch_size)
+        self.dimension = X.shape[1]
+
+
+
 
     def get_batch(self, batch_size):
         if batch_size != self.batch_size:
@@ -211,6 +247,7 @@ class SVMDataset:
         self.max_batch_size = max_batch_size
         self.num_groups = len(self.means)
         self.dim = self.means[0].shape[0]
+        self.dimension = self.means[0].shape[0]
 
     def get_batch(self, batch_size, verbose=False):
         batch_size = min(batch_size, self.max_batch_size)
@@ -305,7 +342,7 @@ def get_batches(protected_datasets, global_dataset, batch_size):
     return global_batch, protected_batches
 
 
-def get_dataset(dataset, batch_size, test_batch_size):
+def get_dataset(dataset, batch_size, test_batch_size, fit_intercept):
 
     if dataset == "Mixture":
         PROTECTED_GROUPS = ["A", "B", "C", "D"]
@@ -367,8 +404,8 @@ def get_dataset(dataset, batch_size, test_batch_size):
         x_all_test = dataframe_all_test[feature_names]
         y_all_test = dataframe_all_test[AdultParams.LABEL_COLUMN]
 
-        train_dataset = DataSet(x_all_train, y_all_train)
-        test_dataset = DataSet(x_all_test, y_all_test)
+        train_dataset = DataSet(x_all_train, y_all_train, fit_intercept = fit_intercept)
+        test_dataset = DataSet(x_all_test, y_all_test, fit_intercept = fit_intercept)
 
         xy_protected_train = collect_adult_protected_xy(
             x_all_train, y_all_train, PROTECTED_GROUPS
@@ -378,10 +415,10 @@ def get_dataset(dataset, batch_size, test_batch_size):
         )
 
         protected_datasets_train = [
-            DataSet(x_vals, y_vals) for (x_vals, y_vals) in xy_protected_train
+            DataSet(x_vals, y_vals, fit_intercept = fit_intercept) for (x_vals, y_vals) in xy_protected_train
         ]
         protected_datasets_test = [
-            DataSet(x_vals, y_vals) for (x_vals, y_vals) in xy_protected_test
+            DataSet(x_vals, y_vals, fit_intercept = fit_intercept) for (x_vals, y_vals) in xy_protected_test
         ]
 
         # protected_datasets_train = [DataSet(x_vals, y_vals) for (x_vals, y_vals) in protected_dataframes_train]
@@ -412,8 +449,8 @@ def get_dataset(dataset, batch_size, test_batch_size):
         y_all_test = dataframe_all_test[GermanParams.LABEL_COLUMN]
 
         # In utilities_final.py: Dataset class to be able to sample batches
-        train_dataset = DataSet(x_all_train, y_all_train)
-        test_dataset = DataSet(x_all_test, y_all_test)
+        train_dataset = DataSet(x_all_train, y_all_train, fit_intercept = fit_intercept)
+        test_dataset = DataSet(x_all_test, y_all_test, fit_intercept = fit_intercept)
 
         xy_protected_train = collect_german_protected_xy(
             x_all_train, y_all_train, PROTECTED_GROUPS
@@ -423,10 +460,10 @@ def get_dataset(dataset, batch_size, test_batch_size):
         )
 
         protected_datasets_train = [
-            DataSet(x_vals, y_vals) for (x_vals, y_vals) in xy_protected_train
+            DataSet(x_vals, y_vals, fit_intercept = fit_intercept) for (x_vals, y_vals) in xy_protected_train
         ]
         protected_datasets_test = [
-            DataSet(x_vals, y_vals) for (x_vals, y_vals) in xy_protected_test
+            DataSet(x_vals, y_vals, fit_intercept = fit_intercept) for (x_vals, y_vals) in xy_protected_test
         ]
 
     elif dataset == "Bank":
@@ -452,8 +489,8 @@ def get_dataset(dataset, batch_size, test_batch_size):
         y_all_test = dataframe_all_test[BankParams.LABEL_COLUMN]
 
         # In utilities_final.py: Dataset class to be able to sample batches
-        train_dataset = DataSet(x_all_train, y_all_train)
-        test_dataset = DataSet(x_all_test, y_all_test)
+        train_dataset = DataSet(x_all_train, y_all_train, fit_intercept = fit_intercept)
+        test_dataset = DataSet(x_all_test, y_all_test, fit_intercept = fit_intercept)
 
         xy_protected_train = collect_bank_protected_xy(
             x_all_train, y_all_train, PROTECTED_GROUPS
@@ -463,10 +500,10 @@ def get_dataset(dataset, batch_size, test_batch_size):
         )
 
         protected_datasets_train = [
-            DataSet(x_vals, y_vals) for (x_vals, y_vals) in xy_protected_train
+            DataSet(x_vals, y_vals, fit_intercept = fit_intercept) for (x_vals, y_vals) in xy_protected_train
         ]
         protected_datasets_test = [
-            DataSet(x_vals, y_vals) for (x_vals, y_vals) in xy_protected_test
+            DataSet(x_vals, y_vals, fit_intercept = fit_intercept) for (x_vals, y_vals) in xy_protected_test
         ]
 
     elif dataset == "Crime":
@@ -499,10 +536,10 @@ def get_dataset(dataset, batch_size, test_batch_size):
         )
 
         protected_datasets_train = [
-            DataSet(x_vals, y_vals) for (x_vals, y_vals) in xy_protected_train
+            DataSet(x_vals, y_vals, fit_intercept = fit_intercept) for (x_vals, y_vals) in xy_protected_train
         ]
         protected_datasets_test = [
-            DataSet(x_vals, y_vals) for (x_vals, y_vals) in xy_protected_test
+            DataSet(x_vals, y_vals, fit_intercept = fit_intercept) for (x_vals, y_vals) in xy_protected_test
         ]
 
     elif dataset == "MNIST":
@@ -583,14 +620,14 @@ def get_dataset(dataset, batch_size, test_batch_size):
     )
 
 
-def get_dataset_simple(dataset, batch_size, test_batch_size):
+def get_dataset_simple(dataset, batch_size, test_batch_size, fit_intercept ):
 
     (
         protected_datasets_train,
         protected_datasets_test,
         train_dataset,
         test_dataset,
-    ) = get_dataset(dataset, batch_size, test_batch_size)
+    ) = get_dataset(dataset, batch_size, test_batch_size, fit_intercept)
 
 
     return train_dataset, test_dataset

@@ -412,8 +412,8 @@ def read_and_preprocess_adult_data_uai(
             # This line causes pandas to complain about incorrect behaviour relating
             # to assigning to a copy of a slice, but still yields the correct result.
             df[continuous_column_name] = pd.cut(
-                df[continuous_column_name], bins, labels=False
-            )
+                df[continuous_column_name].copy(), bins, labels=False
+            ).copy()
 
     # Or, "quantilise" some continuous columns. This means grouping their values
     # into categorical bins based on which of N quantile regions they occupy.
@@ -421,7 +421,7 @@ def read_and_preprocess_adult_data_uai(
     # the quantiles are.
     def quantilise_continuous_column(dataframes, continuous_column_name, num_quantiles):
         _, bins = pd.qcut(
-            dataframes[0][continuous_column_name],
+            dataframes[0][continuous_column_name].copy(),
             num_quantiles,
             retbins=True,
             labels=False,
@@ -612,7 +612,7 @@ def read_and_preprocess_bank_data(
         )
         df[continuous_column_name] = pd.cut(
             df[continuous_column_name], bin_edges, labels=False
-        )
+        ).copy()
 
     for column_name, percentiles in continuous_percentile_buckets:
         percentilise_continuous_column(dataframe, column_name, percentiles)
